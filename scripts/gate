@@ -42,16 +42,24 @@ def verify_tools(image: str, attempt: Path, lock: dict) -> dict[str, str]:
         observed[path] = checksum
     if observed != lock["tools"]:
         raise ValueError("actual tool executable hashes differ from the tool lock")
-    for tool in ("lean", "lake", "rustc", "cargo"):
+    for tool in ("lean", "lake", "rustc", "cargo", "verus"):
         require_success(run_logged([
             "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
             "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
             tool, "--version",
         ], ROOT, attempt, f"version-{tool}"))
-    for tool, field in (("lean", "lean_version"), ("rustc", "rust_version"), ("cargo", "rust_version")):
+    for tool, field in (("lean", "lean_version"), ("rustc", "rust_version"),
+                        ("cargo", "rust_version"), ("verus", "verus_version")):
         version = (attempt / f"version-{tool}.stdout").read_text()
         if lock[field] not in version:
             raise ValueError(f"{tool} version differs from the tool lock")
+    require_success(run_logged([
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "sh", "-c", '"$VERUS_Z3_PATH" --version',
+    ], ROOT, attempt, "version-z3"))
+    if lock["z3_version"] not in (attempt / "version-z3.stdout").read_text():
+        raise ValueError("z3 version differs from the tool lock")
     require_success(run_logged([
         "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
         "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,

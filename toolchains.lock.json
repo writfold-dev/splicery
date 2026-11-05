@@ -7,12 +7,18 @@
   "target": "x86_64-unknown-linux-musl",
   "rust_version": "1.98.0",
   "lean_version": "4.21.0",
+  "verus_version": "0.2026.09.06.8dea4a2",
+  "z3_version": "4.16.0",
   "tools": {
     "/opt/lean/bin/lean": "cbf5fd536e142ef1beaccf33f788fd8a7f3f29fb214e75c11319a8d8677b4b2b",
     "/opt/lean/bin/lake": "26b07ea83c5f7a571a5a9b127130d87afdfe1c527561e380ac0e7f920195157c",
     "/opt/rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
     "/opt/rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
-    "/usr/bin/x86_64-linux-musl-gcc": "044964d21307de947dcb03203c96e52d00aa2a94f57bb1141daabf07a724477f"
+    "/usr/bin/x86_64-linux-musl-gcc": "044964d21307de947dcb03203c96e52d00aa2a94f57bb1141daabf07a724477f",
+    "/opt/verus-x86-linux/verus": "14cf479624e1277e38ecbbc288a4df4c2b7f0c50a5cc5b0ae272a2235037eb81",
+    "/opt/verus-x86-linux/cargo-verus": "1196c45b35a2896515c835aaceccf2f90e58f566ead9756b4f8e12458a2d71e0",
+    "/opt/verus-x86-linux/rust_verify": "cbefc2f6fbfb2c2efc5ee1e641cec360e9eccfd950f949bfe663e0b977049342",
+    "/opt/z3-4.16.0-x64-glibc-2.39/bin/z3": "e583c4186a45e72411fa2cb2048401eed03f0f8e5f24694676a8f6271a50b765"
   },
   "provenance": "Weft toolchains.lock.json inspected read-only; no sibling gate status is inherited"
 }
