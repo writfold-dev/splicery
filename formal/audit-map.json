@@ -1,0 +1,366 @@
+{
+  "schema_version": 1,
+  "scope": "Splicery pure Lean calculus and authority component; not an SG02 or SG03 gate pass",
+  "obligations": [
+    {
+      "id": "L01",
+      "property": "Exact byte cuts and validated half-open ranges decompose the immutable original; invalid bounds refuse without clamping.",
+      "lean_declarations": [
+        "Splicery.splitExact_append",
+        "Splicery.splitExact_eq_none_iff",
+        "Splicery.splitExact_eq_some_iff",
+        "Splicery.splitExact_of_le",
+        "Splicery.splitExact_some_iff",
+        "Splicery.splitExact_sound",
+        "Splicery.cutRange_eq_none_iff",
+        "Splicery.cutRange_of_parts",
+        "Splicery.cutRange_some_iff",
+        "Splicery.cutRange_sound",
+        "Splicery.cut_eof",
+        "Splicery.cut_eq_none_iff",
+        "Splicery.cut_eq_some_iff",
+        "Splicery.cut_of_parts",
+        "Splicery.cut_some_iff",
+        "Splicery.cut_sound",
+        "Splicery.Surface.surfaceCut_rejects_overflow",
+        "Splicery.Surface.surfaceCut_rejects_reversed",
+        "Splicery.Surface.surfaceCut_sound"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-domain/src/lib.rs::SourceSpan::new",
+        "crates/splicery-domain/src/lib.rs::SourceSpan::insertion",
+        "crates/splicery-domain/src/lib.rs::SourceSpan::width",
+        "crates/splicery-kernel/src/lib.rs::apply_at",
+        "crates/splicery-kernel/src/lib.rs::validate_span"
+      ],
+      "positive_examples": [
+        "Splicery.cut_of_parts proves a nonempty exact decomposition.",
+        "Splicery.cut_eof and the EOF Core examples accept a zero-width cut at input length.",
+        "Bounded oracle cases 00, 01 and 02 accept exact replacements, empty-input insertion and EOF deletion."
+      ],
+      "negative_examples": [
+        "Core examples reject reversed, over-EOF and over-width cuts.",
+        "Bounded oracle cases 03 through 08 reject bad offsets, widths and encodings.",
+        "Splicery.Surface.surfaceCut_rejects_reversed and surfaceCut_rejects_overflow reject invalid independent-surface bounds."
+      ],
+      "mutant_ids": ["mutant-accept-reversed-range"]
+    },
+    {
+      "id": "L02",
+      "property": "A splice is exactly prefix, replacement and suffix; exterior bytes are unchanged, keep is identity and length is exact.",
+      "lean_declarations": [
+        "Splicery.applyAt_eof",
+        "Splicery.applyAt_eq_none_iff",
+        "Splicery.applyAt_eq_some_iff",
+        "Splicery.applyAt_length",
+        "Splicery.applyAt_some_iff",
+        "Splicery.apply_local",
+        "Splicery.keep_identity"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-kernel/src/lib.rs::apply_at",
+        "crates/splicery-kernel/src/lib.rs::materialize",
+        "crates/splicery-kernel/src/lib.rs::render"
+      ],
+      "positive_examples": [
+        "Splicery.apply_local exposes the exact output decomposition.",
+        "Splicery.keep_identity proves a selected original span can be copied unchanged.",
+        "Bounded oracle case 00 returns 61585863 from input 616263."
+      ],
+      "negative_examples": [
+        "Splicery.applyAt_eq_none_iff propagates cut refusal with no partial output.",
+        "Bounded oracle cases 03 and 04 reject invalid widths rather than preserving a guessed suffix."
+      ],
+      "mutant_ids": []
+    },
+    {
+      "id": "L03",
+      "property": "Replace, delete, before and after lowering execute with the same denotation as the primitive splice.",
+      "lean_declarations": [
+        "Splicery.lower_correct"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-compile/src/lib.rs::lower",
+        "crates/splicery-compile/src/lib.rs::lower_change",
+        "crates/splicery-kernel/src/lib.rs::apply_at"
+      ],
+      "positive_examples": [
+        "Splicery.lower_correct covers all four Command constructors, including insertion at EOF through Core.applyAt_eof."
+      ],
+      "negative_examples": [
+        "Primitive refusal remains governed by Splicery.applyAt_eq_none_iff; no lowered candidate is asserted for an invalid cut.",
+        "The after-to-start control distinguishes insertion after the selected bytes from insertion at their start."
+      ],
+      "mutant_ids": ["mutant-after-to-before"]
+    },
+    {
+      "id": "L04",
+      "property": "Reads and targets use the authorized immutable image, with origin and capability checks; stale or read-only captures cannot become writable.",
+      "lean_declarations": [
+        "Splicery.Surface.checkTarget_image_read_only",
+        "Splicery.Surface.checkTarget_read_only",
+        "Splicery.Surface.checkTarget_stale",
+        "Splicery.Surface.readCapture_image_read_only",
+        "Splicery.Surface.readCapture_original",
+        "Splicery.Surface.readCapture_stale",
+        "Splicery.Surface.selectedCut_sound",
+        "Splicery.Surface.target_refusal_no_candidate"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-domain/src/lib.rs::OriginalImage::new",
+        "crates/splicery-domain/src/lib.rs::OriginalImage::bytes",
+        "crates/splicery-compile/src/lib.rs::checked_span",
+        "crates/splicery-compile/src/lib.rs::resolve_reference",
+        "crates/splicery-compile/src/lib.rs::resolve_selector"
+      ],
+      "positive_examples": [
+        "Splicery.Surface.readCapture_original derives the exact original source slice for every successful read.",
+        "Splicery.Surface.selectedCut_sound derives the original-image decomposition for every accepted target."
+      ],
+      "negative_examples": [
+        "Stale-image, image-read-only and target-read-only examples in Surface.lean return none.",
+        "Splicery.Surface.target_refusal_no_candidate rules out both direct and lowered candidates after target refusal."
+      ],
+      "mutant_ids": ["mutant-sequential-modified-capture"]
+    },
+    {
+      "id": "L05",
+      "property": "Canonical batches validate positions, refuse every overlap without partial output, preserve original gaps and are permutation independent.",
+      "lean_declarations": [
+        "Splicery.applyAuthored_eq_of_perm",
+        "Splicery.applyAuthored_none_iff",
+        "Splicery.batch_preserves_gaps",
+        "Splicery.canonical_no_partial_result",
+        "Splicery.canonical_rejects_incompatible",
+        "Splicery.canonical_rejects_invalid_range",
+        "Splicery.normalizeAuthored_eq_of_perm",
+        "Splicery.normalizeAuthored_input",
+        "Splicery.normalizeAuthored_positions",
+        "Splicery.normalizeAuthored_preserves_gaps",
+        "Splicery.normalizeAuthored_strict_starts",
+        "Splicery.not_compatible_of_coincident_insertions",
+        "Splicery.not_compatible_of_insertion_at_or_inside_replacement",
+        "Splicery.not_compatible_of_insertion_at_replacement_start",
+        "Splicery.not_compatible_of_intersection",
+        "Splicery.swap_authored_from_original",
+        "Splicery.swap_from_original"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-kernel/src/lib.rs::candidate_len",
+        "crates/splicery-kernel/src/lib.rs::emit_gaps",
+        "crates/splicery-kernel/src/lib.rs::render"
+      ],
+      "positive_examples": [
+        "Splicery.swap_authored_from_original and swap_from_original derive a two-span swap with an arbitrary untouched gap.",
+        "Splicery.applyAuthored_eq_of_perm derives equal output for valid disjoint permutations."
+      ],
+      "negative_examples": [
+        "The four not_compatible theorems cover intersection, coincident insertions and insertion at replacement boundaries.",
+        "Splicery.canonical_no_partial_result and applyAuthored_none_iff expose no partial candidate."
+      ],
+      "mutant_ids": ["mutant-ignore-batch-conflict"]
+    },
+    {
+      "id": "L06",
+      "property": "Source-order lexical scopes and complete frozen matcher evidence enforce cardinality, profile and budget refusal before a candidate.",
+      "lean_declarations": [
+        "Splicery.Surface.eachFrozen_shadow_refusal",
+        "Splicery.Surface.extend_refuses_duplicate",
+        "Splicery.Surface.freeze_members",
+        "Splicery.Surface.frozen_complete_membership",
+        "Splicery.Surface.incomplete_no_frozen",
+        "Splicery.Surface.oneHex_empty_needle_refuses",
+        "Splicery.Surface.over_budget_no_frozen",
+        "Splicery.Surface.raw_no_frozen",
+        "Splicery.Surface.resolveRef_unmatched_group",
+        "Splicery.Surface.truncated_no_frozen",
+        "Splicery.Surface.wrong_expect_no_frozen"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-compile/src/lib.rs::find_binding",
+        "crates/splicery-compile/src/lib.rs::resolve_one",
+        "crates/splicery-domain/src/lib.rs::Budget::charge",
+        "crates/splicery-domain/src/lib.rs::FrozenSet"
+      ],
+      "positive_examples": [
+        "Splicery.Surface.freeze_members and frozen_complete_membership preserve the complete checked inventory and scope.",
+        "Surface nonvacuity examples derive a singleton frozen set and source-order references."
+      ],
+      "negative_examples": [
+        "Duplicate/shadowed binders, empty needles, incomplete or truncated evidence, wrong cardinality, raw profile and excess work all refuse.",
+        "Surface examples include zero, ambiguous and over-budget selections."
+      ],
+      "mutant_ids": ["mutant-drop-missing-optional-group"]
+    },
+    {
+      "id": "L07",
+      "property": "Enabled payload and selector productions preserve exact bytes and text boundaries; direct surface denotation refines to primitive execution or refuses.",
+      "lean_declarations": [
+        "Splicery.Surface.decodeHex_pair",
+        "Splicery.Surface.decodeQuoted_plain",
+        "Splicery.Surface.heredoc_exact",
+        "Splicery.Surface.indent_empty_body",
+        "Splicery.Surface.indent_preserves_recorded_eols",
+        "Splicery.Surface.invalid_text_candidate_refuses",
+        "Splicery.Surface.lowerChange_components",
+        "Splicery.Surface.lowerChange_end_to_end",
+        "Splicery.Surface.lowerChange_executes",
+        "Splicery.Surface.lowerChange_refines",
+        "Splicery.Surface.renderLinesLike_last",
+        "Splicery.Surface.text_profile_boundaries"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-syntax/src/parser.rs::parse_recipe",
+        "crates/splicery-compile/src/lib.rs::lower_payload",
+        "crates/splicery-domain/src/lib.rs::LineEnding::bytes",
+        "crates/splicery-kernel/src/lib.rs::materialize"
+      ],
+      "positive_examples": [
+        "Splicery.Surface.lowerChange_end_to_end covers direct denotation through primitive execution for all Change constructors.",
+        "Quoted, heredoc, raw-hex, lines-like and indent examples in Surface.lean include present-empty payloads and exact CRLF retention."
+      ],
+      "negative_examples": [
+        "Invalid UTF-8 candidates, malformed escapes/hex and invalid text boundaries return none in the Surface examples.",
+        "Splicery.Surface.invalid_text_candidate_refuses prevents a candidate rejected by the text oracle."
+      ],
+      "mutant_ids": ["mutant-normalize-crlf"]
+    },
+    {
+      "id": "L08",
+      "property": "Domain-separated prepared identity binds every input field; live grants, exact active scope and supported current profiles are required without evidence-based authority gain.",
+      "lean_declarations": [
+        "Splicery.changed_input_cannot_reuse_stamp",
+        "Splicery.claim_accepts_live_exact_request",
+        "Splicery.claim_refuses_changed_identity",
+        "Splicery.claim_refuses_read_only",
+        "Splicery.foreign_run_cannot_prepare",
+        "Splicery.preparation_admits_current_exact",
+        "Splicery.read_only_grant_cannot_authorize",
+        "Splicery.read_stamp_is_not_edit_stamp",
+        "Splicery.receipt_cannot_widen_authority",
+        "Splicery.stale_or_unsupported_profile_cannot_prepare",
+        "Splicery.stamp_binds_input",
+        "Splicery.wrong_generation_cannot_authorize"
+      ],
+      "production_rust_symbols": [],
+      "positive_examples": [
+        "Splicery.preparation_admits_current_exact derives admission from a live grant, exact active scope and current supported profiles.",
+        "Splicery.claim_accepts_live_exact_request derives a claimed state from that admission and the exact edit-preparation identity."
+      ],
+      "negative_examples": [
+        "Changed inputs cannot reuse an identity; read and edit identities cannot share a domain.",
+        "Read-only or stale-generation grants, foreign-run aliases and refused stale/unsupported profiles cannot authorize preparation.",
+        "Receipts and citations cannot widen authority; changed identity refuses a claim."
+      ],
+      "mutant_ids": [
+        "mutant-collide-read-edit-kinds",
+        "mutant-reuse-alias-across-runs",
+        "mutant-omit-prepared-input-field",
+        "mutant-accept-stale-unsupported-profile",
+        "mutant-ignore-write-grant"
+      ]
+    },
+    {
+      "id": "L09",
+      "property": "Pure preparation is deterministic, bounded and effect-free; guarded claim/observation/replay transitions and separate file-operation preconditions admit only exact derivations.",
+      "lean_declarations": [
+        "Splicery.changed_intent_same_key_conflicts",
+        "Splicery.confirm_accepts_exact_observation",
+        "Splicery.confirm_refuses_wrong_preimage",
+        "Splicery.create_admits_absent_literal",
+        "Splicery.create_requires_absence",
+        "Splicery.identical_replay_retains_outcome",
+        "Splicery.matching_after_alone_cannot_reconcile",
+        "Splicery.preparePure_budget_refusal",
+        "Splicery.preparePure_deterministic",
+        "Splicery.preparePure_no_effects",
+        "Splicery.preparePure_success_exact_candidate",
+        "Splicery.reconcile_accepts_exact_unknown",
+        "Splicery.remove_admits_regular_source",
+        "Splicery.remove_requires_regular_source",
+        "Splicery.rename_admits_regular_absent_same_filesystem",
+        "Splicery.rename_requires_same_filesystem"
+      ],
+      "production_rust_symbols": [
+        "crates/splicery-domain/src/lib.rs::Budget::charge",
+        "crates/splicery-domain/src/lib.rs::FilePlan",
+        "crates/splicery-domain/src/lib.rs::Plan"
+      ],
+      "positive_examples": [
+        "Splicery.preparePure_success_exact_candidate returns the exact stamped candidate and an empty effect list within budget.",
+        "Exact observations confirm or reconcile; identical request-key replay retains its outcome.",
+        "Create, rename and remove each have a nonvacuous admitted precondition derivation."
+      ],
+      "negative_examples": [
+        "Budget excess returns budgetExceeded with no effects; changed same-key intent conflicts.",
+        "Wrong preimages refuse confirmation and matching after bytes alone cannot reconcile.",
+        "Create requires absence and literal-only content, rename requires regular source, absent destination and one filesystem, and remove requires a regular source."
+      ],
+      "mutant_ids": []
+    }
+  ],
+  "controls": {
+    "mutant-after-to-before": {
+      "gate_scenario": "move after to start",
+      "target": "Splicery.lower_correct"
+    },
+    "mutant-sequential-modified-capture": {
+      "gate_scenario": "sequentially read a modified capture",
+      "target": "Splicery.Surface.readCapture_original"
+    },
+    "mutant-accept-reversed-range": {
+      "gate_scenario": "clamp invalid bound",
+      "target": "Splicery.cutRange_sound"
+    },
+    "mutant-drop-missing-optional-group": {
+      "gate_scenario": "drop missing optional group",
+      "target": "Splicery.Surface.resolveRef_unmatched_group"
+    },
+    "mutant-normalize-crlf": {
+      "gate_scenario": "normalize CRLF",
+      "target": "Splicery.Surface.indent_preserves_recorded_eols"
+    },
+    "mutant-ignore-batch-conflict": {
+      "gate_scenario": "remove overlap refusal",
+      "target": "Splicery.canonical_rejects_incompatible"
+    },
+    "mutant-collide-read-edit-kinds": {
+      "gate_scenario": "collide read and edit kinds",
+      "target": "Splicery.read_stamp_is_not_edit_stamp"
+    },
+    "mutant-reuse-alias-across-runs": {
+      "gate_scenario": "reuse alias from another run",
+      "target": "Splicery.foreign_run_cannot_prepare"
+    },
+    "mutant-omit-prepared-input-field": {
+      "gate_scenario": "omit prepared input field",
+      "target": "Splicery.stamp_binds_input"
+    },
+    "mutant-accept-stale-unsupported-profile": {
+      "gate_scenario": "accept stale or unsupported profile",
+      "target": "Splicery.stale_or_unsupported_profile_cannot_prepare"
+    },
+    "mutant-ignore-write-grant": {
+      "gate_scenario": "retained read-only grant negative control",
+      "target": "Splicery.read_only_grant_cannot_authorize"
+    }
+  },
+  "trusted_assumptions": [
+    "Bytes are finite immutable lists; host adapters supply exact input provenance and range-check unbounded Lean naturals before allocation.",
+    "CanonicalEncoder.encode_injective is a reviewed premise; a digest instantiation must prove DigestEncoder.digest_collision_free rather than infer it from collision resistance alone.",
+    "TextOracle.valid_sound and boundary_sound are instantiated by the named strict UTF-8 decoder and exact boundary implementation.",
+    "Matcher evidence is trusted only after freeze checks origin, scope, completeness, non-truncation, cardinality and conservative work accounting; leftmost-first regex semantics and unique lexer group declarations remain external.",
+    "PreparationPolicy and Grant represent current host evidence for active schema, supported profiles, exact scope, generation and write capability; namespace and run separation are structural equality checks.",
+    "Native create/rename/remove observations, exclusive reservation, current active grant, metadata and a cooperating exclusive worktree are adapter inputs, not proved physical facts.",
+    "Exact recipe-origin spans, heredoc delimiter extraction and all host resource charges are supplied and checked outside the pure calculus.",
+    "Only propext, Classical.choice and Quot.sound are permitted standard logical axioms, each subject to the producer's per-declaration printed-axiom audit."
+  ],
+  "excluded_host_claims": [
+    "No SG02 or SG03 gate pass is asserted; SG00/SG01 receipts for SG02 and the SG02 receipt for SG03 must be established by their own producers and release aggregation.",
+    "No physical filesystem, path containment, descriptor race, durability, atomicity, fsync, ledger or OS authorization theorem is claimed.",
+    "No production Rust authority/preparation implementation is claimed by the empty L08 production_rust_symbols mapping; host wire and IO integration remain excluded.",
+    "No cryptographic digest implementation or canonical wire serialization is proved merely by the encoder premises.",
+    "No parser correctness for edited source, semantic equivalence of user programs, regex-engine correctness or physical resource usage follows from these pure theorems.",
+    "The bounded primitive oracle and calibrated mutants are component evidence, not full host-wire conformance or release qualification."
+  ]
+}

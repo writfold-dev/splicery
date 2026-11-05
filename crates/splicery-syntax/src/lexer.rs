@@ -1,4 +1,6 @@
+use crate::ast::Reference;
 use crate::{DiagnosticKind, Parsed, Parser, diagnostic};
+use splicery_domain::MAX_REGEX_SOURCE_BYTES;
 
 impl<'a> Parser<'a> {
     pub(crate) fn fail<T>(&self, kind: DiagnosticKind, message: &str) -> Parsed<T> {
@@ -10,8 +12,14 @@ impl<'a> Parser<'a> {
         Err(diagnostic(kind, self.at, end, message))
     }
 
-    pub(crate) fn unsupported<T>(&self, message: &str) -> Parsed<T> {
-        self.fail(DiagnosticKind::Unsupported, message)
+    fn fail_at<T>(
+        &self,
+        kind: DiagnosticKind,
+        start: usize,
+        end: usize,
+        message: &str,
+    ) -> Parsed<T> {
+        Err(diagnostic(kind, start, end, message))
     }
 
     pub(crate) fn skip(&mut self) -> Parsed<()> {
@@ -21,20 +29,23 @@ impl<'a> Parser<'a> {
                 b'\r' if self.bytes.get(self.at + 1) == Some(&b'\n') => self.at += 2,
                 b'\r' => return self.fail(DiagnosticKind::Syntax, "lone CR outside a literal"),
                 0 => return self.fail(DiagnosticKind::Syntax, "NUL outside a literal"),
-                b'#' => {
-                    self.at += 1;
-                    while let Some(&next) = self.bytes.get(self.at) {
-                        if next == 0 {
-                            return self.fail(DiagnosticKind::Syntax, "NUL in comment");
-                        }
-                        if next == b'\n' || next == b'\r' {
-                            break;
-                        }
-                        self.at += 1;
-                    }
-                }
+                b'#' => self.comment()?,
                 _ => return Ok(()),
             }
+        }
+        Ok(())
+    }
+
+    fn comment(&mut self) -> Parsed<()> {
+        self.at += 1;
+        while let Some(&byte) = self.bytes.get(self.at) {
+            if byte == 0 {
+                return self.fail(DiagnosticKind::Syntax, "NUL in comment");
+            }
+            if byte == b'\n' || byte == b'\r' {
+                break;
+            }
+            self.at += 1;
         }
         Ok(())
     }
@@ -89,45 +100,57 @@ impl<'a> Parser<'a> {
         self.at += 1;
         let mut value = Vec::new();
         while let Some(&byte) = self.bytes.get(self.at) {
-            if byte == b'"' {
-                self.at += 1;
-                return Ok((value, self.at));
-            }
-            if byte == b'\\' {
-                self.at += 1;
-                let Some(&escape) = self.bytes.get(self.at) else {
-                    return self.fail(DiagnosticKind::Syntax, "unterminated STRING");
-                };
-                let decoded = match escape {
-                    b'"' | b'\\' => escape,
-                    b'n' => b'\n',
-                    b'r' => b'\r',
-                    b't' => b'\t',
-                    _ => return self.fail(DiagnosticKind::Syntax, "invalid STRING escape"),
-                };
-                value.push(decoded);
-                self.at += 1;
-            } else if byte == b'\n' || byte == b'\r' || byte < 0x20 || byte == 0x7f {
-                return self.fail(DiagnosticKind::Syntax, "unescaped control in STRING");
-            } else if byte < 0x80 {
-                value.push(byte);
-                self.at += 1;
-            } else {
-                let Some(ch) = self
-                    .text
-                    .get(self.at..)
-                    .and_then(|tail| tail.chars().next())
-                else {
-                    return self.fail(DiagnosticKind::Encoding, "invalid UTF-8 in STRING");
-                };
-                if ch.is_control() {
+            match byte {
+                b'"' => {
+                    self.at += 1;
+                    return Ok((value, self.at));
+                }
+                b'\\' => self.string_escape(&mut value)?,
+                0..=0x1f | 0x7f => {
                     return self.fail(DiagnosticKind::Syntax, "unescaped control in STRING");
                 }
-                value.extend_from_slice(ch.encode_utf8(&mut [0; 4]).as_bytes());
-                self.at += ch.len_utf8();
+                0x20..=0x7e => {
+                    value.push(byte);
+                    self.at += 1;
+                }
+                _ => self.string_unicode(&mut value)?,
             }
         }
         self.fail(DiagnosticKind::Syntax, "unterminated STRING")
+    }
+
+    fn string_escape(&mut self, value: &mut Vec<u8>) -> Parsed<()> {
+        self.at += 1;
+        let Some(&escape) = self.bytes.get(self.at) else {
+            return self.fail(DiagnosticKind::Syntax, "unterminated STRING");
+        };
+        let decoded = match escape {
+            b'"' | b'\\' => escape,
+            b'n' => b'\n',
+            b'r' => b'\r',
+            b't' => b'\t',
+            _ => return self.fail(DiagnosticKind::Syntax, "invalid STRING escape"),
+        };
+        value.push(decoded);
+        self.at += 1;
+        Ok(())
+    }
+
+    fn string_unicode(&mut self, value: &mut Vec<u8>) -> Parsed<()> {
+        let Some(ch) = self
+            .text
+            .get(self.at..)
+            .and_then(|tail| tail.chars().next())
+        else {
+            return self.fail(DiagnosticKind::Encoding, "invalid UTF-8 in STRING");
+        };
+        if ch.is_control() {
+            return self.fail(DiagnosticKind::Syntax, "unescaped control in STRING");
+        }
+        let mut encoded = [0; 4];
+        value.extend_from_slice(ch.encode_utf8(&mut encoded).as_bytes());
+        self.at += ch.len_utf8();
+        Ok(())
     }
 
     pub(crate) fn path(&mut self) -> Parsed<String> {
@@ -170,6 +193,82 @@ impl<'a> Parser<'a> {
         self.fail(DiagnosticKind::Syntax, "unterminated HEX")
     }
 
+    pub(crate) fn rx(&mut self) -> Parsed<(String, usize)> {
+        self.skip()?;
+        if self.bytes.get(self.at..self.at.saturating_add(3)) != Some(b"rx\"") {
+            return self.fail(DiagnosticKind::Syntax, "expected RX");
+        }
+        self.at += 3;
+        let start = self.at;
+        while let Some(&byte) = self.bytes.get(self.at) {
+            match byte {
+                b'"' => {
+                    let end = self.at;
+                    if end - start > MAX_REGEX_SOURCE_BYTES {
+                        return self.fail_at(DiagnosticKind::Limit, start, end, "RX exceeds 4 KiB");
+                    }
+                    self.check_regex_groups(start, end)?;
+                    self.at += 1;
+                    return Ok((self.text[start..end].to_owned(), self.at));
+                }
+                b'\n' | b'\r' => {
+                    return self.fail(DiagnosticKind::Syntax, "RX must be single-line");
+                }
+                _ => self.at += 1,
+            }
+        }
+        self.fail(DiagnosticKind::Syntax, "unterminated RX")
+    }
+
+    fn check_regex_groups(&self, start: usize, end: usize) -> Parsed<()> {
+        let mut at = start;
+        let mut in_class = false;
+        while at < end {
+            match self.bytes[at] {
+                b'\\' => at = (at + 2).min(end),
+                b'[' if !in_class => {
+                    in_class = true;
+                    at += 1;
+                }
+                b']' if in_class => {
+                    in_class = false;
+                    at += 1;
+                }
+                b'(' if !in_class && self.bytes.get(at..at + 3) == Some(b"(?<") => {
+                    let name_start = at + 3;
+                    let mut cursor = name_start;
+                    if self
+                        .bytes
+                        .get(cursor)
+                        .is_some_and(|byte| is_name_start(*byte))
+                    {
+                        cursor += 1;
+                        while self
+                            .bytes
+                            .get(cursor)
+                            .is_some_and(|byte| name_continue(*byte))
+                        {
+                            cursor += 1;
+                        }
+                        if self.bytes.get(cursor) == Some(&b'>')
+                            && reserved_bytes(&self.bytes[name_start..cursor])
+                        {
+                            return self.fail_at(
+                                DiagnosticKind::Syntax,
+                                name_start,
+                                cursor,
+                                "reserved regex group name",
+                            );
+                        }
+                    }
+                    at += 1;
+                }
+                _ => at += 1,
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn heredoc(&mut self) -> Parsed<(Vec<u8>, usize)> {
         self.skip()?;
         if self.bytes.get(self.at..self.at.saturating_add(3)) != Some(b"<<'") {
@@ -210,20 +309,18 @@ impl<'a> Parser<'a> {
         let content_start = self.at;
         loop {
             let after = self.at + tag.len();
-            if self.bytes.get(self.at..after) == Some(tag) {
-                let newline = self.bytes.get(after..after + 2) == Some(b"\r\n");
-                if self.bytes.get(after) == Some(&b'\n') || newline || after == self.bytes.len() {
-                    let body = self.bytes[content_start..self.at].to_vec();
-                    self.at = after
-                        + if newline {
-                            2
-                        } else if after < self.bytes.len() {
-                            1
-                        } else {
-                            0
-                        };
-                    return Ok((body, self.at));
-                }
+            let newline = self.bytes.get(after..after + 2) == Some(b"\r\n");
+            if self.bytes.get(self.at..after) == Some(tag)
+                && (newline || self.bytes.get(after) == Some(&b'\n') || after == self.bytes.len())
+            {
+                let body = self.bytes[content_start..self.at].to_vec();
+                self.at = after
+                    + if newline {
+                        2
+                    } else {
+                        usize::from(after < self.bytes.len())
+                    };
+                return Ok((body, self.at));
             }
             match self.bytes[self.at..].iter().position(|byte| *byte == b'\n') {
                 Some(width) => self.at += width + 1,
@@ -234,18 +331,30 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn handle(&mut self) -> Parsed<(String, usize)> {
         self.skip()?;
+        let start = self.at;
         if self.bytes.get(self.at) != Some(&b'@') {
             return self.fail(DiagnosticKind::Syntax, "expected HANDLE");
         }
-        let start = self.at;
         self.at += 1;
         let name_start = self.at;
+        let Some((_, end)) = self.scan_name() else {
+            self.at = start;
+            return self.fail(DiagnosticKind::Syntax, "HANDLE requires an ASCII name");
+        };
+        if reserved_bytes(&self.bytes[name_start..end]) {
+            return self.fail_at(DiagnosticKind::Syntax, start, end, "reserved HANDLE name");
+        }
+        Ok((self.text[name_start..end].to_owned(), end))
+    }
+
+    fn scan_name(&mut self) -> Option<(usize, usize)> {
+        let start = self.at;
         if self
             .bytes
             .get(self.at)
             .is_none_or(|byte| !is_name_start(*byte))
         {
-            return self.fail(DiagnosticKind::Syntax, "HANDLE requires an ASCII name");
+            return None;
         }
         self.at += 1;
         while self
@@ -255,20 +364,30 @@ impl<'a> Parser<'a> {
         {
             self.at += 1;
         }
-        let name = &self.text[name_start..self.at];
-        if reserved(name) {
-            self.at = start;
-            return self.fail(DiagnosticKind::Syntax, "reserved HANDLE name");
-        }
-        Ok((name.to_owned(), self.at))
+        Some((start, self.at))
     }
 
-    pub(crate) fn reference(&mut self) -> Parsed<(String, usize)> {
-        let (name, end) = self.handle()?;
+    pub(crate) fn reference(&mut self) -> Parsed<(Reference, usize)> {
+        let (name, mut end) = self.handle()?;
+        let mut group = None;
         if self.eat_byte(b'.')? {
-            return self.unsupported("regex group references are outside this profile");
+            self.skip()?;
+            let start = self.at;
+            let Some((_, group_end)) = self.scan_name() else {
+                return self.fail(DiagnosticKind::Syntax, "group requires an ASCII NAME");
+            };
+            if reserved_bytes(&self.bytes[start..group_end]) {
+                return self.fail_at(
+                    DiagnosticKind::Syntax,
+                    start,
+                    group_end,
+                    "reserved group name",
+                );
+            }
+            group = Some(self.text[start..group_end].to_owned());
+            end = group_end;
         }
-        Ok((name, end))
+        Ok((Reference { name, group }, end))
     }
 
     pub(crate) fn nat(&mut self) -> Parsed<usize> {
@@ -286,21 +405,28 @@ impl<'a> Parser<'a> {
             self.at += 1;
         }
         if self.at - start > 1 && self.bytes[start] == b'0' {
-            self.at = start;
-            return self.fail(DiagnosticKind::Syntax, "NAT has a leading zero");
+            return self.fail_at(
+                DiagnosticKind::Syntax,
+                start,
+                self.at,
+                "NAT has a leading zero",
+            );
         }
         let mut value = 0usize;
         for byte in &self.bytes[start..self.at] {
             let digit = usize::from(byte - b'0');
-            match value.checked_mul(10).and_then(|n| n.checked_add(digit)) {
+            match value
+                .checked_mul(10)
+                .and_then(|number| number.checked_add(digit))
+            {
                 Some(next) => value = next,
                 None => {
-                    return Err(diagnostic(
+                    return self.fail_at(
                         DiagnosticKind::Limit,
                         start,
                         self.at,
                         "NAT exceeds usize",
-                    ));
+                    );
                 }
             }
         }
@@ -322,8 +448,7 @@ fn hex_digit(byte: u8) -> Option<u8> {
         _ => None,
     }
 }
-
-fn reserved(name: &str) -> bool {
+fn reserved_bytes(name: &[u8]) -> bool {
     [
         "edit",
         "as",
@@ -357,5 +482,6 @@ fn reserved(name: &str) -> bool {
         "hex",
         "rx",
     ]
-    .contains(&name)
+    .iter()
+    .any(|word| word.as_bytes() == name)
 }

@@ -16,6 +16,19 @@ FORBIDDEN = re.compile(r"\b(sorry|admit|native_decide)\b|^\s*(?:axiom|unsafe|opa
 THEOREM = re.compile(r"^theorem\s+([A-Za-z_][A-Za-z0-9_'.]*)", re.MULTILINE)
 NAMESPACE = re.compile(r"^namespace\s+([A-Za-z_][A-Za-z0-9_.']*)", re.MULTILINE)
 END_NAMESPACE = re.compile(r"^end\s+([A-Za-z_][A-Za-z0-9_.']*)", re.MULTILINE)
+REQUIRED_CONTROLS = {
+    "mutant-after-to-before": "Splicery.lower_correct",
+    "mutant-sequential-modified-capture": "Splicery.Surface.readCapture_original",
+    "mutant-accept-reversed-range": "Splicery.cutRange_sound",
+    "mutant-drop-missing-optional-group": "Splicery.Surface.resolveRef_unmatched_group",
+    "mutant-normalize-crlf": "Splicery.Surface.indent_preserves_recorded_eols",
+    "mutant-ignore-batch-conflict": "Splicery.canonical_rejects_incompatible",
+    "mutant-collide-read-edit-kinds": "Splicery.read_stamp_is_not_edit_stamp",
+    "mutant-reuse-alias-across-runs": "Splicery.foreign_run_cannot_prepare",
+    "mutant-omit-prepared-input-field": "Splicery.stamp_binds_input",
+    "mutant-accept-stale-unsupported-profile": "Splicery.stale_or_unsupported_profile_cannot_prepare",
+    "mutant-ignore-write-grant": "Splicery.read_only_grant_cannot_authorize",
+}
 
 
 def digest(path: Path) -> str:
@@ -119,6 +132,64 @@ def public_theorems(project: Path) -> list[str]:
     return sorted(names)
 
 
+def validated_audit_map(project: Path, symbols: list[str]) -> tuple[dict, dict[str, str]]:
+    path = project / "audit-map.json"
+    if not path.is_file():
+        raise ValueError("missing formal/audit-map.json")
+    try:
+        audit = json.loads(path.read_text())
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid audit map JSON: {error}") from error
+    if audit.get("schema_version") != 1:
+        raise ValueError("unsupported audit map schema")
+    obligations = audit.get("obligations")
+    if not isinstance(obligations, list):
+        raise ValueError("audit map obligations must be a list")
+    expected_ids = [f"L{number:02}" for number in range(1, 10)]
+    if [entry.get("id") for entry in obligations if isinstance(entry, dict)] != expected_ids:
+        raise ValueError("audit map must order exactly L01 through L09")
+    declared: list[str] = []
+    mapped_controls: list[str] = []
+    required_fields = {"id", "property", "lean_declarations", "production_rust_symbols",
+                       "positive_examples", "negative_examples", "mutant_ids"}
+    for entry in obligations:
+        if not isinstance(entry, dict) or not required_fields <= entry.keys():
+            raise ValueError("incomplete obligation in audit map")
+        for field in ("lean_declarations", "production_rust_symbols", "positive_examples",
+                      "negative_examples", "mutant_ids"):
+            if not isinstance(entry[field], list) or not all(
+                    isinstance(item, str) and item for item in entry[field]):
+                raise ValueError(f"{entry['id']} {field} must be a list of nonempty strings")
+        for field in ("lean_declarations", "positive_examples", "negative_examples"):
+            if not entry[field]:
+                raise ValueError(f"{entry['id']} has empty {field}")
+        declared.extend(entry["lean_declarations"])
+        mapped_controls.extend(entry["mutant_ids"])
+    if len(declared) != len(set(declared)):
+        raise ValueError("public declaration mapped to more than one obligation")
+    if set(declared) != set(symbols):
+        raise ValueError("audit map does not partition the complete public theorem inventory")
+    controls = audit.get("controls")
+    if not isinstance(controls, dict) or set(controls) != set(REQUIRED_CONTROLS):
+        raise ValueError("audit map must name every required control and no unexecuted controls")
+    if (len(mapped_controls) != len(set(mapped_controls)) or
+            set(mapped_controls) != set(REQUIRED_CONTROLS)):
+        raise ValueError("obligation mutant IDs must partition exactly the required controls")
+    control_targets: dict[str, str] = {}
+    for name, target in REQUIRED_CONTROLS.items():
+        entry = controls[name]
+        if not isinstance(entry, dict) or entry.get("target") != target:
+            raise ValueError(f"audit map has wrong target for {name}")
+        if name not in mapped_controls:
+            raise ValueError(f"{name} is not mapped to an obligation")
+        control_targets[name] = target
+    for field in ("trusted_assumptions", "excluded_host_claims"):
+        if not isinstance(audit.get(field), list) or not audit[field] or not all(
+                isinstance(item, str) and item for item in audit[field]):
+            raise ValueError(f"audit map requires nonempty {field}")
+    return audit, control_targets
+
+
 def copy_project(source: Path, destination: Path) -> None:
     for item in sorted(source.rglob("*")):
         if not item.is_file() or ".lake" in item.parts or item.name == "lake-manifest.json":
@@ -133,24 +204,45 @@ def theorem_line(source: Path, name: str) -> int:
     return text[:text.index(f"theorem {name}")].count("\n") + 1
 
 
+def source_line(text: str, marker: str) -> int:
+    if text.splitlines().count(marker) != 1:
+        raise ValueError(f"calibration marker is not unique: {marker!r}")
+    return text.splitlines().index(marker) + 1
+
+
+def error_locations(output: str, filename: str) -> list[int]:
+    locations = []
+    for line in output.splitlines():
+        if "error:" not in line:
+            continue
+        match = re.search(rf"{re.escape(filename)}:(\d+):\d+:", line)
+        if match:
+            locations.append(int(match.group(1)))
+    return locations
+
+
 def require_intended_failure(record: dict, output: Path, control: Path, mutant: Path,
                              module: str, name: str, good: str, broken: str,
-                             mutation_name: str) -> None:
+                             mutation_name: str, allowed_late: tuple[int, ...] = ()) -> None:
     source = mutant / module
     original = source.read_text()
     if original.count(good) != 1:
         raise ValueError(f"{mutation_name} did not select exactly one source expression")
     source.write_text(original.replace(good, broken))
     line = theorem_line(source, name)
+    later_theorems = [match.start() for match in THEOREM.finditer(source.read_text())
+                      if source.read_text()[:match.start()].count("\n") + 1 > line]
+    end = (source.read_text()[:min(later_theorems)].count("\n") + 1
+           if later_theorems else len(source.read_text().splitlines()) + 1)
     result = run(output, mutation_name, ["lake", "build"], mutant)
-    diagnostics = [int(value) for value in re.findall(
-        rf"(?:error:\s*)?{re.escape(Path(module).name)}:(\d+):\d+:", result["output"],
-    )]
-    if result["exit_status"] == 0 or not diagnostics or any(value < line for value in diagnostics):
-        raise ValueError(f"{mutation_name} did not fail at {name}")
+    diagnostics = error_locations(result["output"], Path(module).name)
+    if (result["exit_status"] == 0 or not diagnostics or
+            any(value < line or (value >= end and value not in allowed_late)
+                for value in diagnostics)):
+        raise ValueError(f"{mutation_name} did not fail only at {name}")
     record.setdefault("mutants", []).append({
         "name": mutation_name,
-        "target": name,
+        "target": f"{NAMESPACE.search(lean_code(original)).group(1)}.{name}",
         "diagnostic_lines": diagnostics,
         "source_sha256": digest(source),
     })
@@ -198,7 +290,24 @@ end Splicery
         raise ValueError("batch conflict mutant did not fail only at the coincident-insertion oracle")
     record.setdefault("mutants", []).append({
         "name": "mutant-ignore-batch-conflict",
-        "target": "coincident-insertion refusal oracle",
+        "target": "Splicery.canonical_rejects_incompatible",
+        "diagnostic_lines": diagnostics,
+        "source_sha256": digest(source),
+    })
+
+
+def calibrated_standalone_mutant(record: dict, output: Path, control: Path,
+                                 mutation_name: str, target: str, filename: str,
+                                 source_text: str, diagnostic_line: int) -> None:
+    source = control / filename
+    source.write_text(source_text)
+    result = run(output, mutation_name, ["lake", "env", "lean", str(source)], control)
+    diagnostics = error_locations(result["output"], filename)
+    if result["exit_status"] == 0 or diagnostics != [diagnostic_line]:
+        raise ValueError(f"{mutation_name} did not fail only at its calibrated {target} example")
+    record.setdefault("mutants", []).append({
+        "name": mutation_name,
+        "target": target,
         "diagnostic_lines": diagnostics,
         "source_sha256": digest(source),
     })
@@ -263,6 +372,13 @@ def main() -> int:
         copy_project(formal, mutant)
         symbols = public_theorems(control)
         record["symbols"] = symbols
+        audit_map, control_targets = validated_audit_map(control, symbols)
+        record["audit_map"] = {
+            "path": "formal/audit-map.json",
+            "sha256": digest(control / "audit-map.json"),
+            "obligations": [entry["id"] for entry in audit_map["obligations"]],
+        }
+        record["required_controls"] = control_targets
         checked(destination, "control-build", [lake, "build"], control)
         audit = control / "AxiomAudit.lean"
         audit.write_text("import Splicery\n" + "".join(
@@ -289,14 +405,146 @@ def main() -> int:
         require_intended_failure(
             record, destination, control, mutant, "Splicery/Core.lean", "cutRange_sound",
             "if hi < lo then none else cut xs lo (hi - lo)",
-            "cut xs lo (hi - lo)", "mutant-accept-reversed-range",
+            "cut xs lo (hi - lo)", "mutant-accept-reversed-range", allowed_late=(220, 362),
         )
         batch_conflict_mutant(record, destination, control)
+        sequential_capture = """import Splicery.Surface
+
+namespace Splicery.Surface.Mutants
+
+def mutantOracle : TextOracle where
+  UTF8 := fun _ => True
+  Boundary := fun _ _ => True
+  valid := fun _ => true
+  boundary := fun _ _ => true
+  valid_sound := by intros; trivial
+  boundary_sound := by intros; trivial
+
+def capture : Capture := { region := ⟨7, 0, 1, true, true⟩ }
+def original : Image := ⟨7, [97], true, true⟩
+def modified : Image := ⟨7, [98], true, true⟩
+
+def sequentialReadModifiedCapture : Option Bytes :=
+  let _before := readCapture original .raw mutantOracle capture
+  readCapture modified .raw mutantOracle capture
+
+example : sequentialReadModifiedCapture = some [97] := by
+  decide
+
+end Splicery.Surface.Mutants
+"""
+        calibrated_standalone_mutant(
+            record, destination, control, "mutant-sequential-modified-capture",
+            "Splicery.Surface.readCapture_original", "SequentialCaptureMutant.lean",
+            sequential_capture, source_line(sequential_capture, "  decide"),
+        )
+        missing_group = """import Splicery.Surface
+
+namespace Splicery.Surface.Mutants
+
+def parentCapture : Capture :=
+  { region := ⟨7, 0, 1, true, true⟩, groups := [⟨[2], none⟩] }
+def lexicalEnv : Env := [([1], parentCapture)]
+
+def resolveDroppingMissing : Option Capture :=
+  match lookup lexicalEnv [1] with
+  | none => none
+  | some c =>
+      match findGroup c.groups [2] with
+      | none => none
+      | some _ => some c
+
+example : resolveDroppingMissing = none := by
+  decide
+
+end Splicery.Surface.Mutants
+"""
+        calibrated_standalone_mutant(
+            record, destination, control, "mutant-drop-missing-optional-group",
+            "Splicery.Surface.resolveRef_unmatched_group", "MissingGroupMutant.lean",
+            missing_group, source_line(missing_group, "  decide"),
+        )
+        normalize_crlf = """import Splicery.Surface
+
+namespace Splicery.Surface.Mutants
+
+def normalizeCRLF : Bytes → Bytes
+  | [] => []
+  | 13 :: 10 :: rest => 10 :: normalizeCRLF rest
+  | byte :: rest => byte :: normalizeCRLF rest
+
+example : normalizeCRLF [97, 13, 10, 98] = [97, 13, 10, 98] := by
+  decide
+
+end Splicery.Surface.Mutants
+"""
+        calibrated_standalone_mutant(
+            record, destination, control, "mutant-normalize-crlf",
+            "Splicery.Surface.indent_preserves_recorded_eols", "CrlfMutant.lean",
+            normalize_crlf, source_line(normalize_crlf, "  decide"),
+        )
+        collide_kinds = """import Splicery.Authority
+
+namespace Splicery.Mutants
+
+def collideKinds (encoder : CanonicalEncoder) (_domain : IdentityDomain)
+    (input : PreparedInput) : PreparedIdentity :=
+  ⟨.readCapture, encoder.encode input⟩
+
+example (encoder : CanonicalEncoder) (input : PreparedInput) :
+    collideKinds encoder .readCapture input ≠ collideKinds encoder .editPreparation input := by
+  intro collided
+  injection collided with kind _
+  contradiction
+
+end Splicery.Mutants
+"""
+        calibrated_standalone_mutant(
+            record, destination, control, "mutant-collide-read-edit-kinds",
+            "Splicery.read_stamp_is_not_edit_stamp", "CollideKindsMutant.lean",
+            collide_kinds, source_line(collide_kinds, "  contradiction"),
+        )
+        omitted_field = """import Splicery.Authority
+
+namespace Splicery.Mutants
+
+def stampWithoutCandidate (encoder : CanonicalEncoder) (domain : IdentityDomain)
+    (input : PreparedInput) : PreparedIdentity :=
+  ⟨domain, encoder.encode { input with candidate := [] }⟩
+
+example (encoder : CanonicalEncoder) (left right : PreparedInput)
+    (h : stampWithoutCandidate encoder .editPreparation left =
+      stampWithoutCandidate encoder .editPreparation right) : left = right := by
+  apply encoder.encode_injective
+  injection h with _ encoding
+
+end Splicery.Mutants
+"""
+        calibrated_standalone_mutant(
+            record, destination, control, "mutant-omit-prepared-input-field",
+            "Splicery.stamp_binds_input", "OmittedFieldMutant.lean", omitted_field,
+            source_line(omitted_field, "example (encoder : CanonicalEncoder) (left right : PreparedInput)") + 2,
+        )
+        require_intended_failure(
+            record, destination, control, mutant, "Splicery/Authority.lean", "foreign_run_cannot_prepare",
+            "&&\n    preparationScopeOK policy input", "&&\n    true",
+            "mutant-reuse-alias-across-runs",
+        )
+        require_intended_failure(
+            record, destination, control, mutant, "Splicery/Authority.lean",
+            "stale_or_unsupported_profile_cannot_prepare",
+            "authorizes grant input && preparationProfileOK policy input &&",
+            "authorizes grant input && true &&", "mutant-accept-stale-unsupported-profile",
+        )
         require_intended_failure(
             record, destination, control, mutant, "Splicery/Authority.lean", "read_only_grant_cannot_authorize",
             "grant.write && grant.scope = input.ir.image.scope &&",
             "true && grant.scope = input.ir.image.scope &&", "mutant-ignore-write-grant",
+            allowed_late=(232,),
         )
+        observed_controls = {entry["name"]: entry["target"] for entry in record["mutants"]}
+        if observed_controls != control_targets:
+            raise ValueError("executed controls disagree with the required audit-map controls")
         final_sources = {
             str(path.relative_to(ROOT)): digest(path)
             for path in sorted(formal.rglob("*"))

@@ -130,6 +130,55 @@ theorem receipt_cannot_widen_authority (grant : Grant) (input : PreparedInput)
     (receipt citation : PreparedIdentity) :
     authorizesWithEvidence grant input receipt citation = authorizes grant input := rfl
 
+/-- The active preparation context is host-supplied evidence, not a physical OS
+observation.  Compiler and materializer capabilities are deliberately separate. -/
+structure PreparationPolicy where
+  schemaVersion : Nat
+  compilerProfiles : List Nat
+  materializerProfiles : List Nat
+  scope : WorktreeScope
+  deriving DecidableEq, Repr
+
+def preparationProfileOK (policy : PreparationPolicy) (input : PreparedInput) : Bool :=
+  decide (policy.schemaVersion = input.schemaVersion) &&
+  policy.compilerProfiles.contains input.compilerProfile &&
+  policy.materializerProfiles.contains input.materializerProfile &&
+  decide (input.compilerProfile = input.ir.profile) &&
+  decide (input.ir.profile = input.ir.image.profile)
+
+def preparationScopeOK (policy : PreparationPolicy) (input : PreparedInput) : Bool :=
+  policy.scope = input.ir.image.scope
+
+/-- A live grant alone cannot cross the active run or admit a stale/unsupported
+preparation profile. -/
+def preparationAdmitted (policy : PreparationPolicy) (grant : Grant)
+    (input : PreparedInput) : Bool :=
+  authorizes grant input && preparationProfileOK policy input &&
+    preparationScopeOK policy input
+
+theorem stale_or_unsupported_profile_cannot_prepare
+    {policy : PreparationPolicy} {grant : Grant} {input : PreparedInput}
+    (refused : preparationProfileOK policy input = false) :
+    preparationAdmitted policy grant input = false := by
+  simp [preparationAdmitted, refused]
+
+theorem foreign_run_cannot_prepare
+    {policy : PreparationPolicy} {grant : Grant} {input : PreparedInput}
+    (foreign : policy.scope.run ≠ input.ir.image.scope.run) :
+    preparationAdmitted policy grant input = false := by
+  have different : policy.scope ≠ input.ir.image.scope := by
+    intro same
+    exact foreign (congrArg WorktreeScope.run same)
+  simp [preparationAdmitted, preparationScopeOK, different]
+
+theorem preparation_admits_current_exact
+    {policy : PreparationPolicy} {grant : Grant} {input : PreparedInput}
+    (live : authorizes grant input = true)
+    (profile : preparationProfileOK policy input = true)
+    (scope : preparationScopeOK policy input = true) :
+    preparationAdmitted policy grant input = true := by
+  simp [preparationAdmitted, live, profile, scope]
+
 inductive PreparationRefusal where
   | budgetExceeded
   | unsupportedProfile
@@ -170,29 +219,30 @@ structure EffectState where
   phase : EffectPhase
   deriving DecidableEq, Repr
 
-def claim (encoder : CanonicalEncoder) (grant : Grant)
+def claim (encoder : CanonicalEncoder) (policy : PreparationPolicy) (grant : Grant)
     (request : EffectRequest) : Option EffectState :=
-  if authorizes grant request.input &&
+  if preparationAdmitted policy grant request.input &&
       request.identity = stamp encoder .editPreparation request.input then
     some ⟨request, .claimed⟩
   else
     none
 
-theorem claim_refuses_read_only {encoder : CanonicalEncoder} {grant : Grant}
-    {request : EffectRequest} (readOnly : grant.write = false) :
-    claim encoder grant request = none := by
-  simp [claim, authorizes, readOnly]
+theorem claim_refuses_read_only {encoder : CanonicalEncoder} {policy : PreparationPolicy}
+    {grant : Grant} {request : EffectRequest} (readOnly : grant.write = false) :
+    claim encoder policy grant request = none := by
+  simp [claim, preparationAdmitted, authorizes, readOnly]
 
-theorem claim_refuses_changed_identity {encoder : CanonicalEncoder} {grant : Grant}
-    {request : EffectRequest}
+theorem claim_refuses_changed_identity {encoder : CanonicalEncoder} {policy : PreparationPolicy}
+    {grant : Grant} {request : EffectRequest}
     (changed : request.identity ≠ stamp encoder .editPreparation request.input) :
-    claim encoder grant request = none := by
+    claim encoder policy grant request = none := by
   simp [claim, changed]
 
-theorem claim_accepts_live_exact_request {encoder : CanonicalEncoder} {grant : Grant}
-    {request : EffectRequest} (live : authorizes grant request.input = true)
+theorem claim_accepts_live_exact_request {encoder : CanonicalEncoder} {policy : PreparationPolicy}
+    {grant : Grant} {request : EffectRequest}
+    (live : preparationAdmitted policy grant request.input = true)
     (exact : request.identity = stamp encoder .editPreparation request.input) :
-    claim encoder grant request = some ⟨request, .claimed⟩ := by
+    claim encoder policy grant request = some ⟨request, .claimed⟩ := by
   simp [claim, live, exact]
 
 def confirm (request : EffectRequest) (state : EffectState)
@@ -315,5 +365,16 @@ theorem remove_requires_regular_source {sourceRegular : Bool}
     (admitted : fileOperationAdmitted (.remove sourceRegular) = true) :
     sourceRegular = true := by
   simpa [fileOperationAdmitted] using admitted
+
+/-- Nonvacuous adapter derivations: these are precondition judgments only and
+perform no native file operation. -/
+theorem create_admits_absent_literal :
+    fileOperationAdmitted (.create true true) = true := rfl
+
+theorem rename_admits_regular_absent_same_filesystem :
+    fileOperationAdmitted (.rename true true true) = true := rfl
+
+theorem remove_admits_regular_source :
+    fileOperationAdmitted (.remove true) = true := rfl
 
 end Splicery

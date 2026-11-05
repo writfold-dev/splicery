@@ -1,16 +1,54 @@
 use splicery_domain::RecipeSpan;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Recipe {
-    pub path: String,
-    pub raw: bool,
-    pub statements: Vec<Statement>,
+pub enum Recipe {
+    Edit {
+        path: String,
+        raw: bool,
+        statements: Vec<Statement>,
+    },
+    Create {
+        path: String,
+        raw: bool,
+        payload: Vec<Piece>,
+    },
+    Rename {
+        source: String,
+        destination: String,
+    },
+    Remove {
+        path: String,
+    },
+}
+
+impl Recipe {
+    pub fn path(&self) -> &str {
+        match self {
+            Self::Edit { path, .. } | Self::Create { path, .. } | Self::Remove { path } => path,
+            Self::Rename { source, .. } => source,
+        }
+    }
+
+    pub fn raw(&self) -> bool {
+        match self {
+            Self::Edit { raw, .. } | Self::Create { raw, .. } => *raw,
+            Self::Rename { .. } | Self::Remove { .. } => false,
+        }
+    }
+
+    pub fn statements(&self) -> &[Statement] {
+        match self {
+            Self::Edit { statements, .. } => statements,
+            Self::Create { .. } | Self::Rename { .. } | Self::Remove { .. } => &[],
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Binding(Binding),
     Change(Change),
+    Iteration(Iteration),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,15 +75,48 @@ pub struct Change {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Iteration {
+    pub binder: String,
+    pub collection: Collection,
+    pub changes: Vec<Change>,
+    pub origin: RecipeSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Collection {
+    LineMatches {
+        pattern: String,
+        within: Option<Reference>,
+        expect: usize,
+        origin: RecipeSpan,
+    },
+    Frozen(Reference),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Reference {
+    pub name: String,
+    pub group: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Selector {
-    Reference(String),
+    Reference(Reference),
     OneText {
         needle: Vec<u8>,
-        within: Option<String>,
+        within: Option<Reference>,
+    },
+    OneLine {
+        needle: Vec<u8>,
+        within: Option<Reference>,
     },
     OneHex {
         needle: Vec<u8>,
-        within: Option<String>,
+        within: Option<Reference>,
+    },
+    Between {
+        first: Reference,
+        second: Reference,
     },
     Range {
         lo: usize,
@@ -56,5 +127,13 @@ pub enum Selector {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Piece {
     Literal(Vec<u8>),
-    Keep(String),
+    Keep(Reference),
+    LinesLike {
+        reference: Reference,
+        lines: Vec<Vec<u8>>,
+    },
+    Indent {
+        prefix: Vec<u8>,
+        payload: Vec<Piece>,
+    },
 }
