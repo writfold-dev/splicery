@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "scope": "Mutable Splicery implementation status; qualification/gates.json remains the immutable not_run release registry",
+  "release_profile": "/1",
+  "release_status": "not_qualified",
+  "components": {
+    "handover_import": {
+      "status": "passed_initial_component_check",
+      "evidence": "Initial commit 983c8c0; archive SHA-256 recorded in docs/provenance.md"
+    },
+    "sg00_tool_bootstrap": {
+      "status": "passed_tool_admission_component",
+      "evidence": "splicery-evidence/sg00-bootstrap-001/receipt.json",
+      "not_claimed": [
+        "cold offline dependency-closure reproduction",
+        "Verus executable-body/compiler admission",
+        "SG00 release completion"
+      ]
+    },
+    "sg01_independent_grammar": {
+      "status": "passed_syntax_lexer_component",
+      "evidence": "splicery-evidence/sg01-grammar-001/receipt.json",
+      "cases": 105,
+      "mutants_killed": 4,
+      "not_claimed": [
+        "regex engine correctness",
+        "selector semantics",
+        "host integration",
+        "full SG01 release completion while SG00 remains open"
+      ]
+    },
+    "lean_seed": {
+      "status": "passed_seed_only",
+      "evidence": "splicery-evidence/lean-seed-002/seed-receipt.json and splicery-evidence/lean-gate-001/receipt.json",
+      "not_claimed": [
+        "SG02 or SG03 completion"
+      ]
+    },
+    "lean_calculus": {
+      "status": "implementation_in_progress",
+      "compiled_modules": [
+        "Splicery.Core",
+        "Splicery.Batch",
+        "Splicery.Authority",
+        "Splicery.Lowering"
+      ],
+      "open": [
+        "Surface elaboration and semantic review",
+        "complete public-theorem axiom/mutation/oracle receipt",
+        "SG02/SG03 release disposition"
+      ]
+    },
+    "rust_binary": {
+      "status": "not_started_pending_surface_calculus",
+      "not_claimed": [
+        "SG04-SG06",
+        "SG13",
+        "production write capability"
+      ]
+    },
+    "writfold_integration": {
+      "status": "externally_blocked",
+      "blockers": [
+        "P01O/WF24 retained-branch relocation",
+        "owner-published shared-stdio contract artifact",
+        "real Worktrunk/native-effect receipts"
+      ]
+    }
+  }
+}
