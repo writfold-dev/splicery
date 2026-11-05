@@ -152,6 +152,90 @@ inductive AdapterEffect where
   | ledgerAppend
   deriving DecidableEq, Repr
 
+structure EffectRequest where
+  input : PreparedInput
+  identity : PreparedIdentity
+  requestKey : Nat
+  semanticIntent : Bytes
+  deriving DecidableEq, Repr
+
+inductive EffectPhase where
+  | claimed
+  | confirmed
+  | unknown
+  deriving DecidableEq, Repr
+
+structure EffectState where
+  request : EffectRequest
+  phase : EffectPhase
+  deriving DecidableEq, Repr
+
+def claim (encoder : CanonicalEncoder) (grant : Grant)
+    (request : EffectRequest) : Option EffectState :=
+  if authorizes grant request.input &&
+      request.identity = stamp encoder .editPreparation request.input then
+    some ⟨request, .claimed⟩
+  else
+    none
+
+theorem claim_refuses_read_only {encoder : CanonicalEncoder} {grant : Grant}
+    {request : EffectRequest} (readOnly : grant.write = false) :
+    claim encoder grant request = none := by
+  simp [claim, authorizes, readOnly]
+
+theorem claim_refuses_changed_identity {encoder : CanonicalEncoder} {grant : Grant}
+    {request : EffectRequest}
+    (changed : request.identity ≠ stamp encoder .editPreparation request.input) :
+    claim encoder grant request = none := by
+  simp [claim, changed]
+
+def confirm (request : EffectRequest) (state : EffectState)
+    (observedBefore observedAfter : Bytes) : Option EffectState :=
+  if state.phase = .claimed && state.request = request &&
+      observedBefore = request.input.ir.image.contents &&
+      observedAfter = request.input.candidate then
+    some ⟨request, .confirmed⟩
+  else
+    none
+
+theorem confirm_refuses_wrong_preimage (request : EffectRequest) (state : EffectState)
+    (observedBefore : Bytes) (wrong : observedBefore ≠ request.input.ir.image.contents) :
+    confirm request state observedBefore request.input.candidate = none := by
+  simp [confirm, wrong]
+
+def loseConfirmation (state : EffectState) : Option EffectState :=
+  if state.phase = .claimed then some ⟨state.request, .unknown⟩ else none
+
+def reconcile (state : EffectState) (observedBefore observedAfter : Bytes) : Option EffectState :=
+  if state.phase = .unknown &&
+      observedBefore = state.request.input.ir.image.contents &&
+      observedAfter = state.request.input.candidate then
+    some ⟨state.request, .confirmed⟩
+  else
+    none
+
+theorem matching_after_alone_cannot_reconcile (state : EffectState)
+    (observedBefore : Bytes)
+    (wrong : observedBefore ≠ state.request.input.ir.image.contents) :
+    reconcile state observedBefore state.request.input.candidate = none := by
+  simp [reconcile, wrong]
+
+def replaySameKey (stored : EffectState) (request : EffectRequest) : Except Unit EffectState :=
+  if stored.request.requestKey = request.requestKey && stored.request = request then
+    .ok stored
+  else
+    .error ()
+
+theorem identical_replay_retains_outcome (stored : EffectState) :
+    replaySameKey stored stored.request = .ok stored := by
+  simp [replaySameKey]
+
+theorem changed_intent_same_key_conflicts (stored : EffectState) (request : EffectRequest)
+    (sameKey : stored.request.requestKey = request.requestKey)
+    (changed : stored.request ≠ request) :
+    replaySameKey stored request = .error () := by
+  simp [replaySameKey, sameKey, changed]
+
 /-- The public pure-preparation result has no hidden effect channel. Work
 accounting is supplied explicitly and checked before a candidate is returned. -/
 def preparePure (encoder : CanonicalEncoder) (work : PreparedInput → Nat)
