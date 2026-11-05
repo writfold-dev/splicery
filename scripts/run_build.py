@@ -90,7 +90,7 @@ def main() -> int:
     output = args.evidence.resolve()
     if output.is_relative_to(ROOT) or output.exists():
         parser.error("use a fresh evidence directory outside the source tree")
-    output.mkdir(parents=True, mode=0o700, exist_ok=False)
+    output.mkdir(parents=True, mode=0o755, exist_ok=False)
     record: dict[str, object] = {
         "schema_version": 1,
         "scope": "locked offline static musl workspace build only",
@@ -120,17 +120,33 @@ def main() -> int:
         record["cargo_version"] = cargo_version
         record["rustc_version"] = rust_version
         command = [
-            cargo, "build", "--workspace", "--locked", "--offline",
+            cargo, "build", "--workspace", "--release", "--locked", "--offline",
             "--target", TARGET, "--message-format=json-render-diagnostics",
         ]
         record["command"] = command
         result = checked(output, "cargo-build", command)
         record["artifacts"] = collect_artifacts(result.stdout)
+        executables = [artifact for artifact in record["artifacts"]
+                       if artifact.get("executable") is True]
+        if len(executables) != 1:
+            raise ValueError("build must produce exactly one Splicery client executable")
+        source = Path(executables[0]["path"])
+        client = output / "splicery"
+        shutil.copyfile(source, client)
+        client.chmod(0o755)
+        record["client"] = {"path": client.name, "sha256": digest(client),
+                            "size_bytes": client.stat().st_size, "static_elf_x86_64": True}
+        smoke = checked(output, "runtime-smoke", [
+            str(client), "kernel", "apply", "1", "1", "616263", "5858",
+        ])
+        if smoke.stdout != b"61585863\n":
+            raise ValueError("static client returned the wrong kernel smoke result")
+        record["runtime_smoke"] = {"command": smoke.args, "stdout_hex": smoke.stdout.hex()}
         record["status"] = "passed_locked_offline_static_musl_build_only"
     except (OSError, UnicodeError, ValueError, KeyError, struct.error) as error:
         record["reason"] = f"{type(error).__name__}: {error}"
     finally:
-        descriptor = os.open(output / "build-results.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        descriptor = os.open(output / "build-results.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             json.dump(record, stream, indent=2)
             stream.write("\n")

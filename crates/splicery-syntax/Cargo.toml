@@ -1,0 +1,15 @@
+[package]
+name = "splicery-syntax"
+description = "Strict Splicery recipe AST and parser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+splicery-domain.workspace = true
+
+[lints]
+workspace = true

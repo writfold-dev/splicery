@@ -1,0 +1,19 @@
+[package]
+name = "splicery-cli"
+description = "Offline Splicery preview and static client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+splicery-domain.workspace = true
+splicery-syntax.workspace = true
+splicery-compile.workspace = true
+splicery-kernel.workspace = true
+splicery-wire.workspace = true
+
+[lints]
+workspace = true

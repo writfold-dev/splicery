@@ -23,7 +23,7 @@ Both sibling worktrees also contain unrelated uncommitted operator work. Splicer
 
 - Platform: Linux/WSL x86_64; container platform `linux/amd64`.
 - Parent image: `writfold-tools@sha256:c854889f19c83174e69600ee28f0d4d35a0d2de1a23b3a35b1ecf4c4a88e0fc6`.
-- Tool versions: Lean 4.21.0, Rust/Cargo 1.98.0, target `x86_64-unknown-linux-musl`.
+- Tool versions: Lean 4.21.0, Rust/Cargo 1.98.0, Verus 0.2026.09.06.8dea4a2, Z3 4.16.0, target `x86_64-unknown-linux-musl`.
 - Storage is admitted only by the existing `ci-infra` observation and `~/.local/share/buildbot-ci/storage.json`; Splicery does not relocate Docker or caches.
 - Qualification runs use Splicery-owned Compose caches, read-only source mounts, no network, 8 CPUs, 12 GiB memory and 1024 PIDs.
 - Fresh evidence is private and outside the checkout under `~/workspace/splicery-evidence/`. Failed attempts are retained; repository commits contain source, not private raw evidence.

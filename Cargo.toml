@@ -1,0 +1,43 @@
+[workspace]
+members = [
+    "crates/splicery-domain",
+    "crates/splicery-syntax",
+    "crates/splicery-compile",
+    "crates/splicery-kernel",
+    "crates/splicery-wire",
+    "crates/splicery-cli",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0-dev.0"
+edition = "2024"
+rust-version = "1.98"
+repository = "https://github.com/writfold-dev/splicery"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+splicery-domain = { path = "crates/splicery-domain" }
+splicery-syntax = { path = "crates/splicery-syntax" }
+splicery-compile = { path = "crates/splicery-compile" }
+splicery-kernel = { path = "crates/splicery-kernel" }
+splicery-wire = { path = "crates/splicery-wire" }
+vstd = "=0.0.0-2026-09-06-0133"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

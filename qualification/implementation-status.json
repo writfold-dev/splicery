@@ -10,10 +10,9 @@
     },
     "sg00_tool_bootstrap": {
       "status": "passed_tool_admission_component",
-      "evidence": "splicery-evidence/sg00-bootstrap-001/receipt.json",
+      "evidence": "splicery-evidence/sg00-bootstrap-003/receipt.json",
       "not_claimed": [
         "cold offline dependency-closure reproduction",
-        "Verus executable-body/compiler admission",
         "SG00 release completion"
       ]
     },
@@ -37,24 +36,48 @@
       ]
     },
     "lean_calculus": {
-      "status": "implementation_in_progress",
+      "status": "passed_calculus_component",
+      "evidence": "splicery-evidence/full-proofs-005/proof-receipt.json and splicery-evidence/lean-gate-002/receipt.json",
+      "public_theorems": 97,
+      "oracle_cases": 9,
+      "mutants_killed": 4,
       "compiled_modules": [
         "Splicery.Core",
         "Splicery.Batch",
+        "Splicery.Surface",
         "Splicery.Authority",
         "Splicery.Lowering"
       ],
       "open": [
-        "Surface elaboration and semantic review",
-        "complete public-theorem axiom/mutation/oracle receipt",
-        "SG02/SG03 release disposition"
+        "SG02/SG03 release disposition against the complete predecessor closure"
       ]
     },
     "rust_binary": {
-      "status": "not_started_pending_surface_calculus",
+      "status": "passed_offline_static_preview_component",
+      "layout": [
+        "splicery-domain",
+        "splicery-syntax",
+        "splicery-compile",
+        "splicery-kernel",
+        "splicery-wire",
+        "splicery-cli"
+      ],
+      "evidence": {
+        "static_musl_build": "splicery-evidence/musl-build-006/receipt.json",
+        "preview_cases": "splicery-evidence/preview-smoke-004/preview-receipt.json",
+        "lean_rust_differential": "splicery-evidence/differential-004/differential-receipt.json",
+        "verus_apply_at": "splicery-evidence/verus-008/verus-receipt.json",
+        "scratch_runtime": "splicery-runtime:006"
+      },
+      "verified_behavior": {
+        "rust_tests": 14,
+        "preview_cases": 12,
+        "lean_rust_cases": 9,
+        "verus_apply_at_obligations": 1
+      },
       "not_claimed": [
-        "SG04-SG06",
-        "SG13",
+        "complete SG04-SG06 profile gates",
+        "SG13 release reproduction and SBOM completion",
         "production write capability"
       ]
     },
