@@ -86,7 +86,7 @@ def main():
         src.write_text(original.replace(good,broken))
         theorem_line = original[:original.index('theorem lower_correct')].count('\n')+1
         code,out = run(dest,'mutant-build',[lake,'build'],dest/'mutant')
-        locations = [int(i) for i in re.findall(r'Lowering\.lean:(\d+):\d+:\s*error:',out)]
+        locations = [int(i) for i in re.findall(r'(?:error:\s*)?Lowering\.lean:(\d+):\d+:',out)]
         if code==0 or not locations or any(i<theorem_line for i in locations):
             raise ValueError('The chosen lower_correct negative control did not fail as required')
         record['semantic_mutant']={'changed':'after lowered to start','diagnostics_lines':locations,
