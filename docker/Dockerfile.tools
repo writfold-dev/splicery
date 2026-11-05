@@ -1,0 +1,10 @@
+ARG SPLICERY_PARENT_IMAGE
+FROM ${SPLICERY_PARENT_IMAGE}
+WORKDIR /work/splicery
+ENV CARGO_TARGET_DIR=/cache/target/rust-1.98.0 \
+    CARGO_BUILD_JOBS=8 \
+    CARGO_NET_OFFLINE=true \
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C target-feature=+crt-static" \
+    PYTHONDONTWRITEBYTECODE=1
+LABEL org.opencontainers.image.title="Splicery qualification tools" \
+      org.opencontainers.image.description="Isolated Splicery configuration over the exact admitted local tool image"

@@ -1,0 +1,39 @@
+name: splicery
+
+services:
+  qualify:
+    image: ${SPLICERY_TOOL_IMAGE:?Run scripts/gate bootstrap first}
+    pull_policy: never
+    platform: linux/amd64
+    working_dir: /work/splicery
+    network_mode: none
+    cpus: 8
+    mem_limit: 12884901888
+    pids_limit: 1024
+    init: true
+    environment:
+      CARGO_TARGET_DIR: /cache/target/rust-1.98.0
+      CARGO_BUILD_JOBS: 8
+      CARGO_NET_OFFLINE: "true"
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - type: bind
+        source: .
+        target: /work/splicery
+        read_only: true
+      - type: bind
+        source: ${SPLICERY_ATTEMPT:?Select a fresh out-of-tree evidence directory}
+        target: /evidence
+      - target:/cache/target
+      - registry:/opt/cargo/registry
+      - git:/opt/cargo/git
+    command: [python3, -B, tools/check_lean_seed.py, --evidence, /evidence/lean-seed]
+
+volumes:
+  target:
+    name: splicery-rust-1.98.0-target
+  registry:
+    name: splicery-rust-1.98.0-registry
+  git:
+    name: splicery-rust-1.98.0-git

@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""Source-bound Splicery SG00 admission and narrowly scoped Lean/build producers."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import uuid
+
+sys.dont_write_bytecode = True
+from evidence import capture_sources, digest, manifest, process_env, require_success, run_logged, write_new
+from preflight import observe
+
+ROOT = Path(__file__).resolve().parent.parent
+STATE = Path.home() / ".local/share/splicery"
+IMAGE_TAG = "splicery-tools:qualification"
+TOOL_INPUTS = ["docker/Dockerfile.tools", "compose.yaml", "toolchains.lock.json"]
+
+
+def inspect_image(reference: str) -> dict[str, object]:
+    images = json.loads(subprocess.check_output([
+        "docker", "image", "inspect", reference,
+    ], text=True, timeout=30))
+    if not isinstance(images, list) or len(images) != 1 or not isinstance(images[0], dict):
+        raise ValueError("Docker did not return exactly one admitted image")
+    return images[0]
+
+
+def verify_tools(image: str, attempt: Path, lock: dict) -> dict[str, str]:
+    args = [
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "sha256sum", *lock["tools"],
+    ]
+    require_success(run_logged(args, ROOT, attempt, "tool-bytes"))
+    observed = {}
+    for line in (attempt / "tool-bytes.stdout").read_text().splitlines():
+        checksum, path = line.split(maxsplit=1)
+        observed[path] = checksum
+    if observed != lock["tools"]:
+        raise ValueError("actual tool executable hashes differ from the tool lock")
+    for tool in ("lean", "lake", "rustc", "cargo"):
+        require_success(run_logged([
+            "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+            "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+            tool, "--version",
+        ], ROOT, attempt, f"version-{tool}"))
+    for tool, field in (("lean", "lean_version"), ("rustc", "rust_version"), ("cargo", "rust_version")):
+        version = (attempt / f"version-{tool}.stdout").read_text()
+        if lock[field] not in version:
+            raise ValueError(f"{tool} version differs from the tool lock")
+    require_success(run_logged([
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "rustc", "--print", "target-libdir", "--target", lock["target"],
+    ], ROOT, attempt, "musl-target-libdir"))
+    target_libdir = (attempt / "musl-target-libdir.stdout").read_text().strip()
+    if len(target_libdir.splitlines()) != 1 or not Path(target_libdir).is_absolute():
+        raise ValueError("Rust returned an invalid musl target library directory")
+    require_success(run_logged([
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "python3", "-c",
+        "from pathlib import Path; import sys; p = Path(sys.argv[1]); "
+        "raise SystemExit(0 if p.is_dir() and any(p.glob('libstd-*.rlib')) else 1)",
+        target_libdir,
+    ], ROOT, attempt, "musl-target-installed"))
+    return observed
+
+
+def bootstrap(attempt: Path, lock: dict) -> dict:
+    parent = inspect_image(lock["parent_image"])
+    if (parent["Id"] != lock["parent_image_id"]
+            or parent["Os"] != "linux" or parent["Architecture"] != "amd64"
+            or lock["parent_image"] not in parent.get("RepoDigests", [])):
+        raise ValueError("parent image identity/platform does not match the local admission")
+    inputs = manifest(ROOT, TOOL_INPUTS)
+    # The BuildKit docker driver can resolve repo@digest through a registry even
+    # for a loaded local-only image. Bind a Splicery-owned alias to the verified
+    # immutable ID, then prove the alias still names that exact image afterwards.
+    alias = f"splicery-qualified-base:sha256-{parent['Id'].split(':', 1)[1]}"
+    require_success(run_logged([
+        "docker", "image", "tag", parent["Id"], alias,
+    ], ROOT, attempt, "bind-local-base"))
+    require_success(run_logged([
+        "docker", "buildx", "inspect",
+    ], ROOT, attempt, "buildkit-identity"))
+    require_success(run_logged([
+        "docker", "buildx", "build", "--network=none", "--pull=false", "--load",
+        "--build-arg", f"SPLICERY_PARENT_IMAGE={alias}",
+        "--file", "docker/Dockerfile.tools", "--tag", IMAGE_TAG, ".",
+    ], ROOT, attempt, "buildkit-tools"))
+    if inspect_image(alias)["Id"] != parent["Id"]:
+        raise ValueError("verified local base alias changed during BuildKit execution")
+    image = inspect_image(IMAGE_TAG)
+    if image["Os"] != "linux" or image["Architecture"] != "amd64":
+        raise ValueError("built tool image platform differs from the lock")
+    tools = verify_tools(image["Id"], attempt, lock)
+    if inputs != manifest(ROOT, TOOL_INPUTS):
+        raise ValueError("build inputs changed during tool admission")
+    admission = {
+        "schema_version": 1,
+        "parent_image": lock["parent_image"],
+        "parent_image_id": lock["parent_image_id"],
+        "image_id": image["Id"],
+        "inputs": inputs,
+        "tools": tools,
+        "receipt_directory": str(attempt),
+    }
+    STATE.mkdir(parents=True, mode=0o700, exist_ok=True)
+    pointer = STATE / "tool-admission.json"
+    temporary = STATE / f"tool-admission-{uuid.uuid4().hex}.json"
+    write_new(temporary, admission)
+    os.replace(temporary, pointer)
+    return admission
+
+
+def admitted_image(lock: dict) -> str:
+    admission = json.loads((STATE / "tool-admission.json").read_text())
+    if (admission["schema_version"] != 1
+            or admission["parent_image"] != lock["parent_image"]
+            or admission["parent_image_id"] != lock["parent_image_id"]
+            or admission["inputs"] != manifest(ROOT, TOOL_INPUTS)):
+        raise ValueError("tool recipe/lock changed; a fresh bootstrap is required")
+    image = inspect_image(admission["image_id"])
+    if (image["Id"] != admission["image_id"] or admission["tools"] != lock["tools"]
+            or image["Os"] != "linux" or image["Architecture"] != "amd64"):
+        raise ValueError("stored tool admission is not applicable")
+    return image["Id"]
+
+
+def compose_run(attempt: Path, image: str, gate: str, command: list[str]) -> None:
+    name = f"splicery-{gate}-{uuid.uuid4().hex}"
+    args = [
+        "docker", "compose", "run", "--rm", "--name", name,
+        "qualify", "timeout", "--signal=TERM", "--kill-after=30", "1800", *command,
+    ]
+    try:
+        require_success(run_logged(
+            args, ROOT, attempt, f"compose-{gate}",
+            env=process_env(SPLICERY_TOOL_IMAGE=image, SPLICERY_ATTEMPT=str(attempt)),
+            timeout=1900,
+        ))
+    finally:
+        # This unique name belongs only to this attempt; never prune other work.
+        subprocess.run(["docker", "rm", "--force", name], capture_output=True, check=False)
+
+
+def lean(attempt: Path, lock: dict) -> dict:
+    image = admitted_image(lock)
+    verify_tools(image, attempt, lock)
+    source_inputs = [
+        "formal", "tools/check_lean_seed.py", "toolchains.lock.json", "compose.yaml",
+    ]
+    inputs = manifest(ROOT, source_inputs)
+    capture_sources(ROOT, source_inputs, attempt / "proof-source.zip")
+    compose_run(attempt, image, "lean", [
+        "python3", "-B", "tools/check_lean_seed.py", "--evidence", "/evidence/lean-seed",
+    ])
+    if inputs != manifest(ROOT, source_inputs):
+        raise ValueError("proof inputs changed during qualification")
+    result = json.loads((attempt / "lean-seed/seed-receipt.json").read_text())
+    if result["status"] != "passed_seed_only" or result["scope"] != "Lean seed only":
+        raise ValueError("Lean producer did not complete the explicitly scoped seed check")
+    formal_sources = {
+        relative: checksum for relative, checksum in inputs.items()
+        if relative.startswith("formal/") and Path(relative).name != "lake-manifest.json"
+    }
+    if result["sources"] != formal_sources:
+        raise ValueError("Lean seed source identity differs from the admitted formal project")
+    return {"image_id": image, "source_manifest": inputs, "producer": result}
+
+
+def build(attempt: Path, lock: dict) -> dict:
+    if not (ROOT / "Cargo.toml").is_file() or not (ROOT / "Cargo.lock").is_file():
+        raise ValueError(
+            "no real Cargo workspace: root Cargo.toml and Cargo.lock are required; build was not run"
+        )
+    image = admitted_image(lock)
+    verify_tools(image, attempt, lock)
+    source_inputs = ["."]
+    inputs = manifest(ROOT, source_inputs)
+    capture_sources(ROOT, source_inputs, attempt / "build-source.zip")
+    compose_run(attempt, image, "build", [
+        "python3", "-B", "scripts/run_build.py", "--evidence", "/evidence/build",
+        "--rust-version", lock["rust_version"],
+    ])
+    if inputs != manifest(ROOT, source_inputs):
+        raise ValueError("build inputs changed during qualification")
+    result = json.loads((attempt / "build/build-results.json").read_text())
+    if (result["status"] != "passed_locked_offline_static_musl_build_only"
+            or result["target"] != lock["target"]
+            or result["locked"] is not True or result["offline"] is not True):
+        raise ValueError("build producer did not complete its locked offline static musl scope")
+    return {"image_id": image, "source_manifest": inputs, "producer": result}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("gate", choices=["bootstrap", "lean", "build"])
+    parser.add_argument("--receipt", required=True, type=Path,
+                        help="fresh file in a new out-of-tree attempt directory")
+    args = parser.parse_args()
+    receipt = args.receipt.expanduser().resolve()
+    if receipt.is_relative_to(ROOT):
+        parser.error("receipts must be outside the source checkout")
+    attempt = receipt.parent
+    try:
+        attempt.mkdir(parents=True, mode=0o700, exist_ok=False)
+    except FileExistsError:
+        parser.error("the receipt parent must be a fresh directory; prior evidence is never overwritten")
+    attempt.chmod(0o700)
+    record: dict[str, object] = {
+        "schema_version": 1, "gate": args.gate, "status": "fail",
+        "scope": {
+            "bootstrap": "sg00-splicery-tool-admission-only",
+            "lean": "splicery-lean-seed-only",
+            "build": "sg00-splicery-locked-offline-static-musl-build-only",
+        }[args.gate],
+        "skipped": [],
+    }
+    try:
+        producer_inputs = ["scripts/gate", "scripts/evidence.py", "scripts/preflight.py"]
+        if args.gate == "build":
+            producer_inputs.append("scripts/run_build.py")
+        record["producer_inputs"] = manifest(ROOT, producer_inputs)
+        record["producer_snapshot"] = capture_sources(
+            ROOT, producer_inputs + TOOL_INPUTS, attempt / "producer-source.zip",
+        )
+        record["preflight"] = observe(ROOT)
+        lock = json.loads((ROOT / "toolchains.lock.json").read_text())
+        record["tool_lock_sha256"] = digest(ROOT / "toolchains.lock.json")
+        if args.gate == "bootstrap":
+            record["result"] = bootstrap(attempt, lock)
+        elif args.gate == "lean":
+            record["result"] = lean(attempt, lock)
+        else:
+            record["result"] = build(attempt, lock)
+        if record["producer_inputs"] != manifest(ROOT, producer_inputs):
+            raise ValueError("qualification producer changed while executing")
+        record["status"] = "pass"
+    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError) as error:
+        record["error"] = f"{type(error).__name__}: {error}"
+    write_new(receipt, record)
+    print(json.dumps({"status": record["status"], "receipt": str(receipt)}, indent=2))
+    return 0 if record["status"] == "pass" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

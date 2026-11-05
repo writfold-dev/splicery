@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "scope": "Expected Splicery tool identities; each gate verifies actual bytes and retains fresh observations",
+  "parent_image": "writfold-tools@sha256:c854889f19c83174e69600ee28f0d4d35a0d2de1a23b3a35b1ecf4c4a88e0fc6",
+  "parent_image_id": "sha256:c854889f19c83174e69600ee28f0d4d35a0d2de1a23b3a35b1ecf4c4a88e0fc6",
+  "platform": "linux/amd64",
+  "target": "x86_64-unknown-linux-musl",
+  "rust_version": "1.98.0",
+  "lean_version": "4.21.0",
+  "tools": {
+    "/opt/lean/bin/lean": "cbf5fd536e142ef1beaccf33f788fd8a7f3f29fb214e75c11319a8d8677b4b2b",
+    "/opt/lean/bin/lake": "26b07ea83c5f7a571a5a9b127130d87afdfe1c527561e380ac0e7f920195157c",
+    "/opt/rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
+    "/opt/rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
+    "/usr/bin/x86_64-linux-musl-gcc": "044964d21307de947dcb03203c96e52d00aa2a94f57bb1141daabf07a724477f"
+  },
+  "provenance": "Weft toolchains.lock.json inspected read-only; no sibling gate status is inherited"
+}
