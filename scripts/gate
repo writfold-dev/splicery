@@ -60,6 +60,20 @@ def verify_tools(image: str, attempt: Path, lock: dict) -> dict[str, str]:
     ], ROOT, attempt, "version-z3"))
     if lock["z3_version"] not in (attempt / "version-z3.stdout").read_text():
         raise ValueError("z3 version differs from the tool lock")
+    tlc_probe = run_logged([
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "java", "-cp", "/opt/tla/tla2tools.jar", "tlc2.TLC", "-h",
+    ], ROOT, attempt, "version-tlc")
+    if tlc_probe["exit_code"] not in (0, 1):
+        require_success(tlc_probe)
+    if lock["tlc_version"] not in (attempt / "version-tlc.stdout").read_text():
+        raise ValueError("TLC version differs from the tool lock")
+    require_success(run_logged([
+        "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
+        "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,
+        "/opt/tlapm/bin/tlapm", "--version",
+    ], ROOT, attempt, "version-tlapm"))
     require_success(run_logged([
         "docker", "run", "--rm", "--network=none", "--platform=linux/amd64",
         "--cpus=8", "--memory=12884901888", "--pids-limit=1024", image,

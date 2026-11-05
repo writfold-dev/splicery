@@ -9,6 +9,7 @@
   "lean_version": "4.21.0",
   "verus_version": "0.2026.09.06.8dea4a2",
   "z3_version": "4.16.0",
+  "tlc_version": "2.19",
   "tools": {
     "/opt/lean/bin/lean": "cbf5fd536e142ef1beaccf33f788fd8a7f3f29fb214e75c11319a8d8677b4b2b",
     "/opt/lean/bin/lake": "26b07ea83c5f7a571a5a9b127130d87afdfe1c527561e380ac0e7f920195157c",
@@ -18,7 +19,9 @@
     "/opt/verus-x86-linux/verus": "14cf479624e1277e38ecbbc288a4df4c2b7f0c50a5cc5b0ae272a2235037eb81",
     "/opt/verus-x86-linux/cargo-verus": "1196c45b35a2896515c835aaceccf2f90e58f566ead9756b4f8e12458a2d71e0",
     "/opt/verus-x86-linux/rust_verify": "cbefc2f6fbfb2c2efc5ee1e641cec360e9eccfd950f949bfe663e0b977049342",
-    "/opt/z3-4.16.0-x64-glibc-2.39/bin/z3": "e583c4186a45e72411fa2cb2048401eed03f0f8e5f24694676a8f6271a50b765"
+    "/opt/z3-4.16.0-x64-glibc-2.39/bin/z3": "e583c4186a45e72411fa2cb2048401eed03f0f8e5f24694676a8f6271a50b765",
+    "/opt/tla/tla2tools.jar": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+    "/opt/tlapm/bin/tlapm": "d975503212624e6e4c70a82a22547c1bf8e50ecc0578a78794a48251f0dfc39b"
   },
   "provenance": "Weft toolchains.lock.json inspected read-only; no sibling gate status is inherited"
 }

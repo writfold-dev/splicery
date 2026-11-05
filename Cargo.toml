@@ -24,6 +24,10 @@ splicery-compile = { path = "crates/splicery-compile" }
 splicery-kernel = { path = "crates/splicery-kernel" }
 splicery-wire = { path = "crates/splicery-wire" }
 vstd = "=0.0.0-2026-09-06-0133"
+regex = "=1.11.1"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.11.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
