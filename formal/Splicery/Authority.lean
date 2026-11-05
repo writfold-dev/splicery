@@ -189,6 +189,12 @@ theorem claim_refuses_changed_identity {encoder : CanonicalEncoder} {grant : Gra
     claim encoder grant request = none := by
   simp [claim, changed]
 
+theorem claim_accepts_live_exact_request {encoder : CanonicalEncoder} {grant : Grant}
+    {request : EffectRequest} (live : authorizes grant request.input = true)
+    (exact : request.identity = stamp encoder .editPreparation request.input) :
+    claim encoder grant request = some ⟨request, .claimed⟩ := by
+  simp [claim, live, exact]
+
 def confirm (request : EffectRequest) (state : EffectState)
     (observedBefore observedAfter : Bytes) : Option EffectState :=
   if state.phase = .claimed && state.request = request &&
@@ -202,6 +208,12 @@ theorem confirm_refuses_wrong_preimage (request : EffectRequest) (state : Effect
     (observedBefore : Bytes) (wrong : observedBefore ≠ request.input.ir.image.contents) :
     confirm request state observedBefore request.input.candidate = none := by
   simp [confirm, wrong]
+
+theorem confirm_accepts_exact_observation {request : EffectRequest} {state : EffectState}
+    (claimed : state.phase = .claimed) (same : state.request = request) :
+    confirm request state request.input.ir.image.contents request.input.candidate =
+      some ⟨request, .confirmed⟩ := by
+  simp [confirm, claimed, same]
 
 def loseConfirmation (state : EffectState) : Option EffectState :=
   if state.phase = .claimed then some ⟨state.request, .unknown⟩ else none
@@ -219,6 +231,12 @@ theorem matching_after_alone_cannot_reconcile (state : EffectState)
     (wrong : observedBefore ≠ state.request.input.ir.image.contents) :
     reconcile state observedBefore state.request.input.candidate = none := by
   simp [reconcile, wrong]
+
+theorem reconcile_accepts_exact_unknown (state : EffectState)
+    (unknown : state.phase = .unknown) :
+    reconcile state state.request.input.ir.image.contents state.request.input.candidate =
+      some ⟨state.request, .confirmed⟩ := by
+  simp [reconcile, unknown]
 
 def replaySameKey (stored : EffectState) (request : EffectRequest) : Except Unit EffectState :=
   if stored.request.requestKey = request.requestKey && stored.request = request then

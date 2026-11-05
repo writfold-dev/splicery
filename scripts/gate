@@ -161,18 +161,19 @@ def lean(attempt: Path, lock: dict) -> dict:
     image = admitted_image(lock)
     verify_tools(image, attempt, lock)
     source_inputs = [
-        "formal", "tools/check_lean_seed.py", "toolchains.lock.json", "compose.yaml",
+        "formal", "tools/check_proofs.py", "toolchains.lock.json", "compose.yaml",
     ]
     inputs = manifest(ROOT, source_inputs)
     capture_sources(ROOT, source_inputs, attempt / "proof-source.zip")
     compose_run(attempt, image, "lean", [
-        "python3", "-B", "tools/check_lean_seed.py", "--evidence", "/evidence/lean-seed",
+        "python3", "-B", "tools/check_proofs.py", "--evidence", "/evidence/lean-proofs",
     ])
     if inputs != manifest(ROOT, source_inputs):
         raise ValueError("proof inputs changed during qualification")
-    result = json.loads((attempt / "lean-seed/seed-receipt.json").read_text())
-    if result["status"] != "passed_seed_only" or result["scope"] != "Lean seed only":
-        raise ValueError("Lean producer did not complete the explicitly scoped seed check")
+    result = json.loads((attempt / "lean-proofs/proof-receipt.json").read_text())
+    if (result["status"] != "passed_calculus_component"
+            or result["scope"] != "Splicery Lean calculus and bounded primitive oracle"):
+        raise ValueError("Lean producer did not complete the scoped calculus/oracle check")
     formal_sources = {
         relative: checksum for relative, checksum in inputs.items()
         if relative.startswith("formal/") and Path(relative).name != "lake-manifest.json"
@@ -225,7 +226,7 @@ def main() -> int:
         "schema_version": 1, "gate": args.gate, "status": "fail",
         "scope": {
             "bootstrap": "sg00-splicery-tool-admission-only",
-            "lean": "splicery-lean-seed-only",
+            "lean": "splicery-lean-calculus-and-primitive-oracle-component",
             "build": "sg00-splicery-locked-offline-static-musl-build-only",
         }[args.gate],
         "skipped": [],

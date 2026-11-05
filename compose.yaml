@@ -28,7 +28,7 @@ services:
       - target:/cache/target
       - registry:/opt/cargo/registry
       - git:/opt/cargo/git
-    command: [python3, -B, tools/check_lean_seed.py, --evidence, /evidence/lean-seed]
+    command: [python3, -B, tools/check_proofs.py, --evidence, /evidence/lean-proofs]
 
 volumes:
   target:

@@ -1,5 +1,6 @@
 import Splicery.Lowering
 import Splicery.Batch
+import Splicery.Surface
 import Splicery.Authority
 
 /-! Splicery's source calculus. `tools/check_proofs.py` performs the clean
