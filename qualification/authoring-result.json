@@ -1,0 +1,58 @@
+{
+  "grammar": {
+    "accept": 9,
+    "reject": 13
+  },
+  "recipes": {
+    "recipe_files": 11,
+    "extra_refusals": 9
+  },
+  "byte_cases": {
+    "one_op": 4092,
+    "two_op": 18675
+  },
+  "ir_vector_count": 3,
+  "gates": 15,
+  "protocol_python_only": {
+    "states": 84,
+    "edges": 130,
+    "mutants": {
+      "skip_live": {
+        "invariant_failure": "unchecked_write",
+        "trace": [
+          "prepare",
+          "claim",
+          "revoke",
+          "write"
+        ]
+      },
+      "unfenced": {
+        "invariant_failure": "lost_fence",
+        "trace": [
+          "prepare",
+          "claim",
+          "transfer"
+        ]
+      },
+      "confirm_timeout": {
+        "invariant_failure": "false_confirmation",
+        "trace": [
+          "prepare",
+          "claim",
+          "lost",
+          "confirm"
+        ]
+      },
+      "blind_reissue": {
+        "invariant_failure": "double_write",
+        "trace": [
+          "prepare",
+          "claim",
+          "write",
+          "lost",
+          "unconditional_retry"
+        ]
+      }
+    }
+  }
+}

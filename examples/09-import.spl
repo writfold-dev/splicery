@@ -1,0 +1,7 @@
+edit "sdk/src/lib.rs" {
+  @a := one line "// imports begin"
+  @b := one line "// imports end"
+  @window := between @a and @b
+  @anchor := one line "use lib::Config;" within @window
+  before @anchor insert lines like @anchor ["use lib::Policy;"]
+}

@@ -1,0 +1,5 @@
+edit "service/config/routes.conf" {
+  each @r in line_matches rx"^route[ \t]+(?<verb>[A-Z]+)[ \t]+(?<path>/\S+)$" expect 3 {
+    replace @r with [keep(@r.verb), " ", keep(@r.path)]
+  }
+}

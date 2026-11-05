@@ -1,0 +1,4 @@
+edit "fixtures/frame.bin" as bytes {
+  @slot := one hex"00ff"
+  replace @slot with hex"80fe"
+}

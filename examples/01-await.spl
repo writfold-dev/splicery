@@ -1,0 +1,4 @@
+edit "sdk/src/client.rs" {
+  @call := one text "transport.send(request)"
+  after @call insert ".await"
+}

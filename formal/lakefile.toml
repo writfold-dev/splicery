@@ -1,0 +1,6 @@
+name = "splicery_reference"
+version = "0.1.0"
+defaultTargets = ["Splicery"]
+
+[[lean_lib]]
+name = "Splicery"

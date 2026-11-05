@@ -1,0 +1,57 @@
+[
+  {
+    "name": "01-await",
+    "input_text": "let reply = transport.send(request)?;\r\n",
+    "output_text": "let reply = transport.send(request).await?;\r\n"
+  },
+  {
+    "name": "02-wrap",
+    "input_text": "let x = send(\r\n    req, // café\n)?;",
+    "output_text": "let x = trace_send(send(\r\n    req, // café\n))?;"
+  },
+  {
+    "name": "03-policy",
+    "input_text": "keep\n<!-- policy:begin -->\nobsolete\n<!-- policy:end -->\nend",
+    "output_text": "keep\n<!-- policy:begin -->\nAttempts: 3\nBackoff: exponential\n<!-- policy:end -->\nend"
+  },
+  {
+    "name": "04-routes",
+    "input_text": "# routes\r\nroute  GET /health\r\nroute POST /jobs\nroute GET /v2/jobs",
+    "output_text": "# routes\r\nGET /health\r\nPOST /jobs\nGET /v2/jobs"
+  },
+  {
+    "name": "05-swap",
+    "input_text": "alpha beta",
+    "output_text": "beta alpha"
+  },
+  {
+    "name": "06-raw",
+    "input_hex": "aa00ffbb",
+    "output_hex": "aa80febb"
+  },
+  {
+    "name": "07-lines",
+    "input_text": "[capture]\r\nobsolete",
+    "output_text": "[capture]\r\nA\r\nB\r\n"
+  },
+  {
+    "name": "08-indent",
+    "input_text": "a\r\n\nbc",
+    "output_text": "  a\r\n\n  bc"
+  },
+  {
+    "name": "09-import",
+    "input_text": "// imports begin\nuse lib::Config;\n// imports end\nuse lib::Config;\n",
+    "output_text": "// imports begin\nuse lib::Policy;\nuse lib::Config;\n// imports end\nuse lib::Config;\n"
+  },
+  {
+    "name": "10-move",
+    "input_text": "# pinned\noption=old\nfoo=1\nTAIL",
+    "output_text": "foo=1\n# pinned\noption=old\nTAIL"
+  },
+  {
+    "name": "11-absence",
+    "input_text": "y",
+    "refusal": "AbsentGroup"
+  }
+]

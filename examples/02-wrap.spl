@@ -1,0 +1,4 @@
+edit "sdk/src/driver.rs" {
+  @expr := range [8,34)
+  replace @expr with ["trace_send(", keep(@expr), ")"]
+}

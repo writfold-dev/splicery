@@ -1,0 +1,6 @@
+edit "cfg/service.conf" {
+  @old := one text "# pinned\noption=old\n"
+  @dest := one text "TAIL"
+  delete @old
+  before @dest insert keep(@old)
+}

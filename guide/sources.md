@@ -1,0 +1,16 @@
+# Decision basis and sibling boundaries
+
+Reviewed on 5 November 2026. Pins identify consulted sources. Recheck actual artifact, capabilities, instructions and exact runtime before integration.
+
+| Source | Adopted constraint |
+|---|---|
+| [Writfold ownership / execution](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/handovers/revision-5/writfold/plan/20-execution-and-cross-repository.md) | One coordinator per stream; Worktrunk; worktree ownership; conditional effects; unknown outcomes and reconciliation |
+| [Run Watch and intake](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/handovers/revision-9/writfold/plan/27-run-watch-and-session-handoff.md) and [scoped adoption](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/docs/writfold/revision-9-features.md) | Start before checkout; authenticated committed RunRef; shared Run Watch; revision 5 remains implementation authority |
+| [Writfold shared references](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/docs/writfold/shared-client-references.md) | Reuse typed exact byte/alias concepts; introduce a separate dirty-worktree profile; capability names in this package are proposals |
+| [Current Writfold repository](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/README.md) | Durable EngineeringLedger/authoritative writer and production services are dependencies; retained-branch Omnigraph relocation gate P01O/WF24 is recorded blocked |
+| [Weft implementation](https://github.com/writfold-dev/weft/blob/db116fd773b593c8ee16cbb322f1822f3fb067a7/docs/rust-implementation.md) and [execution contract](https://github.com/writfold-dev/weft/blob/db116fd773b593c8ee16cbb322f1822f3fb067a7/docs/execution-integration.md) | Standalone sibling, finite proof reports, shared stdio. Local Weft proof output carries no edit authority. No Weft dependency in Splicery kernel |
+| [Weft syntax](https://github.com/writfold-dev/weft/blob/db116fd773b593c8ee16cbb322f1822f3fb067a7/spec/language.md) | The immutable binding operator is :=. Splicery additionally prefixes local capture names with @ |
+| [Weft tool profile](https://github.com/writfold-dev/weft/blob/db116fd773b593c8ee16cbb322f1822f3fb067a7/docs/build-and-qualification.md) and [Writfold quality plan](https://github.com/writfold-dev/writfold/blob/b202ae28d41a883a21d1e3a082b5cb6426b385d6/handovers/revision-5/writfold/plan/05-build-and-quality.md) | WSL/Linux x86_64, pinned offline Compose, external BuildKit storage and evidence requirements |
+| [Private playbook adoption pin](private:playbook) | Follow the owner-adopted version. Private sources and receipts stay private; public documentation is separately scoped |
+
+Splicery plan choices made here: one source of edit semantics, v1 one file per atomic content operation, plain UTF-8/byte profiles, same-file keep, conservative overlap refusal, one host effect per create/remove/rename, no automatic stale-anchor remap. Splicery owns its frozen IR; Writfold owns its adapter/wire admission. Avoid introducing a second writer, new DB, general harness or second proof-language runtime. An adopting agent must register any changed decision and its affected gates.

@@ -1,0 +1,24 @@
+document     = file_edit | create_file | rename_file | remove_file | fragment ;
+file_edit    = "edit" STRING [ "as" "bytes" ] "{" { statement } "}" ;
+create_file  = "create" STRING [ "as" "bytes" ] "with" payload ;
+rename_file  = "rename" STRING "to" STRING ;
+remove_file  = "remove" STRING ;
+fragment     = statement { statement } ;
+statement    = binding | change | iteration ;
+binding      = HANDLE ":=" selector ;
+change       = "replace" selector "with" payload
+             | "before" selector "insert" payload
+             | "after" selector "insert" payload
+             | "delete" selector ;
+iteration    = "each" HANDLE "in" collection "{" { change } "}" ;
+collection   = "line_matches" RX [ "within" reference ] "expect" NAT
+             | "frozen" reference ;
+selector     = reference
+             | "one" ( "text" STRING | "line" STRING | HEX ) [ "within" reference ]
+             | "between" reference "and" reference
+             | "range" "[" NAT "," NAT ")" ;
+reference    = HANDLE [ "." NAME ] ;
+payload      = piece | "[" [ piece { "," piece } ] "]" ;
+piece        = STRING | HEREDOC | HEX | "keep" "(" reference ")"
+             | "lines" "like" reference "[" STRING { "," STRING } "]"
+             | "indent" "(" STRING "," payload ")" ;

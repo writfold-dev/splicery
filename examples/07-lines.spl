@@ -1,0 +1,5 @@
+edit "docs/config.ini" {
+  @banner := one line "[capture]"
+  @here := one line "obsolete"
+  replace @here with lines like @banner ["A", "B"]
+}

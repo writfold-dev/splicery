@@ -1,0 +1,104 @@
+{
+  "document": "illustrative logical exchange; names, IDs and digests are labels, not wire vectors",
+  "profile": "worktree-edit/1 proposed",
+  "trace": [
+    {
+      "step": "intake",
+      "input": {
+        "plan": "plan@P",
+        "weft_report": "report@V",
+        "repos": [
+          "api",
+          "sdk"
+        ],
+        "finish": "reviewed patch",
+        "request_key": "start-1"
+      },
+      "result": {
+        "run_ref": "demo/RUN-017",
+        "committed_event": "event-1"
+      }
+    },
+    {
+      "step": "bind_worktrees",
+      "result": {
+        "binding_revision": "binding-1",
+        "worktrees": [
+          "api@W1",
+          "sdk@W2"
+        ]
+      }
+    },
+    {
+      "step": "inspect",
+      "input": {
+        "file": "sdk/src/client.rs",
+        "binding_revision": "binding-1"
+      },
+      "result": {
+        "capture": "image-C",
+        "profile": "dirty-worktree-utf8/1",
+        "scope": "principal/session-8/epoch-2",
+        "target": "@call",
+        "selection": "exact expression"
+      }
+    },
+    {
+      "step": "prepare",
+      "input": {
+        "capture": "image-C",
+        "recipe": "after @call insert \".await\""
+      },
+      "result": {
+        "prepared": "prep-P",
+        "preimage": "image-C",
+        "candidate": "image-D",
+        "preview": "transport.send(request).await?"
+      }
+    },
+    {
+      "step": "apply",
+      "input": {
+        "prepared": "prep-P",
+        "key": "write-1",
+        "expected_run_head": "event-2",
+        "ownership_generation": 4
+      },
+      "result": {
+        "effect": "E1",
+        "state": "Confirmed",
+        "observed_candidate": "image-D"
+      }
+    },
+    {
+      "step": "apply_identical_retry",
+      "input": {
+        "prepared": "prep-P",
+        "key": "write-1"
+      },
+      "result": {
+        "effect": "E1",
+        "duplicate": true,
+        "new_target_writes": 0
+      }
+    }
+  ],
+  "countertraces": [
+    {
+      "scenario": "formatter intervenes before dispatch",
+      "result": "StaleTarget; bound bytes unchanged by adapter; peek again"
+    },
+    {
+      "scenario": "loss after write before acknowledgement",
+      "result": "Unknown E1; lookup/reconcile original claim; no blind retry"
+    },
+    {
+      "scenario": "same key, different payload",
+      "result": "Conflict; no dispatch"
+    },
+    {
+      "scenario": "opaque KB citation supplied as editable target",
+      "result": "WrongKind; no prepare"
+    }
+  ]
+}

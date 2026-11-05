@@ -1,0 +1,5 @@
+edit "data/table" {
+  each @r in line_matches rx"^(?<first>x)?y$" expect 1 {
+    replace @r with keep(@r.first)
+  }
+}

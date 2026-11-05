@@ -1,0 +1,28 @@
+{
+  "accept": [
+    "@call := one text \"call()\"\nafter @call insert \".await\"",
+    "delete range [0,0)",
+    "create \"api/README.md\" with \"hello\\n\"",
+    "rename \"api/old\" to \"api/new\"",
+    "remove \"api/a.txt\"",
+    "each @r in frozen @hits { replace @r.name with \"ok\" }",
+    "replace @x with []",
+    "edit \"r/x\" { # comment\n @window := range [0,2) }",
+    "after @a insert <<'X'\r\n# raw $x\r\nX"
+  ],
+  "reject": [
+    "let @call = one text \"x\"",
+    "@call = one text \"x\"",
+    "@a := one text",
+    "@each := one text \"x\"",
+    "replace @a with hex\"abc\"",
+    "edit \"r/f\" { delete range [01,2) }",
+    "replace @a with \"\\u1234\"",
+    "edit \"r/x\" { each @a in line_matches rx\"x\" { delete @a } }",
+    "replace @x with <<'T'\nunterminated",
+    "delete @one",
+    "edit \"a\" {",
+    "edit \"r/f\" {} junk",
+    "replace @x with [\"a\",]"
+  ]
+}

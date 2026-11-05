@@ -1,0 +1,76 @@
+[
+  {
+    "recipe": "01-await",
+    "splices": [
+      {
+        "target": [
+          35,
+          35
+        ],
+        "parts": [
+          {
+            "literal_hex": "2e6177616974"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "recipe": "02-wrap",
+    "splices": [
+      {
+        "target": [
+          8,
+          34
+        ],
+        "parts": [
+          {
+            "literal_hex": "74726163655f73656e6428"
+          },
+          {
+            "copy": [
+              8,
+              34
+            ]
+          },
+          {
+            "literal_hex": "29"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "recipe": "05-swap",
+    "splices": [
+      {
+        "target": [
+          0,
+          5
+        ],
+        "parts": [
+          {
+            "copy": [
+              6,
+              10
+            ]
+          }
+        ]
+      },
+      {
+        "target": [
+          6,
+          10
+        ],
+        "parts": [
+          {
+            "copy": [
+              0,
+              5
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

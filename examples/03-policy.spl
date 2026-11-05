@@ -1,0 +1,8 @@
+edit "docs/operations.md" {
+  @begin := one line "<!-- policy:begin -->"
+  @end_marker := one line "<!-- policy:end -->"
+  replace between @begin and @end_marker with <<'POLICY'
+Attempts: 3
+Backoff: exponential
+POLICY
+}

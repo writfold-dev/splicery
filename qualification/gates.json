@@ -1,0 +1,219 @@
+{
+  "profile": "Splicery /1 full",
+  "authority": "planning register",
+  "gates": [
+    {
+      "id": "SG00",
+      "title": "Provenance and local build",
+      "owner": "Build owner",
+      "requires": [],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "All source/tool/dependency pins resolved; external drive and floors verified; offline clean bootstrap reproduces tool identities; exact musl/Verus strategy admitted.",
+      "negative_controls": "Detach/mismatch external volume, move a cache to the system disk, change tool digest, run offline with missing artifact. Preflight refuses before allocating heavy jobs.",
+      "receipt_material": "Tool lock, storage attestation, source/Compose closure, fresh offline and negative logs."
+    },
+    {
+      "id": "SG01",
+      "title": "Language freeze and grammar",
+      "owner": "Language owner",
+      "requires": [
+        "SG00"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Normative EBNF, lexer, semantics, example inputs, spans, ambiguity rules and /1 capability registry agree. EBNF positive/negative corpus and wholly independent parser tests; exact @name := spelling.",
+      "negative_controls": "Retired assignment, invalid UTF-8, mixed EOL/heredoc delimiter, truncated input, reserved handle, huge limb, overlapping text ambiguity and parser-depth attacks.",
+      "receipt_material": "Grammar and lexer identities, full golden tokens/AST/diagnostics with byte spans, rejected mutants."
+    },
+    {
+      "id": "SG02",
+      "title": "Lean byte and surface calculus",
+      "owner": "Proof owner",
+      "requires": [
+        "SG01"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Clean Lean build, L01–L07 across enabled profile; independent surface denotation, lexer/resolution assumptions, sound lowering including refusal, batch normalization and exact original-source keep. Audit every public theorem and run executable oracle.",
+      "negative_controls": "Move after to start; sequentially read a modified capture; clamp invalid bound; drop a missing optional group; normalize CRLF; remove overlap refusal. Each compiles as a mutant where applicable and fails intended theorem or calibrated oracle.",
+      "receipt_material": "Clean Lake logs, source/tool identity, symbol and permitted axiom inventory, mutation reports, oracle artifact."
+    },
+    {
+      "id": "SG03",
+      "title": "Lean authority and preparation",
+      "owner": "Proof and host owners",
+      "requires": [
+        "SG02"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "L08–L09, typed namespace/generation separation, stable inputs, preparation nonmutation, guarded lifecycle semantics, no authority gain by receipt/citation. Enumerate trusted crypto/OS/origin assumptions.",
+      "negative_controls": "Collide read and edit kinds, reuse alias from another run, omit prepared input field, accept stale or unsupported profile. One legitimate derivation per safety family.",
+      "receipt_material": "Theorem inventory, traces of pass/refusal/nonvacuity, axiom audit, reviewed assumptions."
+    },
+    {
+      "id": "SG04",
+      "title": "Frontend, profile and nominal APIs",
+      "owner": "Compiler owner",
+      "requires": [
+        "SG02"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Raw input→checked AST→resolved IR works through CLI/library. Strict UTF-8, raw bytes, groups, scopes, paths and budgets; reproducible canonical vectors. Compile-fail tests for checked types.",
+      "negative_controls": "Unknown/duplicate keys, offset type swap, wrong image, overflow, trace truncation, regex engine exhaustion, aliased same text in other scope.",
+      "receipt_material": "Compiled fixture logs, public-path output, AST-to-source map, per-phase max/budget counters."
+    },
+    {
+      "id": "SG05",
+      "title": "Shipping Rust refinement",
+      "owner": "Kernel owner",
+      "requires": [
+        "SG03",
+        "SG04"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Verus verifies actual selected production bodies and checked conversions/unaltered outside bytes for normalized batch. Audit bridges from proof definitions to exact shipping configuration. Differential compare Lean and Rust on success/refusal including input bytes, normalized IR, complete after-image and origins.",
+      "negative_controls": "Wrong coordinate order, unchecked length add, accidental Unicode normalization, sequential swap, deletion of one source linkage, zero-length boundary bug.",
+      "receipt_material": "Verus logs and selected function mapping, trusted-base inventory, independent Lean↔Rust vectors, mutation results."
+    },
+    {
+      "id": "SG06",
+      "title": "Structural quality and bounded execution",
+      "owner": "Independent reviewer",
+      "requires": [
+        "SG04",
+        "SG05"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Enforce engineering.md budgets, dependencies, lints, nominal types, module ownership, regex resource profile, no hidden writes. Fuzz lexer/wire/normalizer and adversarial large batches in a controlled environment; measure memory and total work at and above limits.",
+      "negative_controls": "Oversize module/macro, forbidden dependency/re-export, macro panic, wrong type deserialized, quadratic repeated visits, large output via repeated keep.",
+      "receipt_material": "AST/graph/lint and compile-fail receipts, memory/time ceilings, fuzz seeds/crashes, reviewed narrowly scoped exceptions."
+    },
+    {
+      "id": "SG07",
+      "title": "Operational model and inductive proofs",
+      "owner": "Protocol owner",
+      "requires": [
+        "SG03"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Extended TLA+ model, TLC finite fault schedules and TLAPS inductive safety plus implementation-action bridge; the supplied seed alone cannot pass. Separate safety/liveness and fairness assumptions.",
+      "negative_controls": "Blind retry Unknown; grant checked only in prepare; stale generation writes; duplicate key with changed intent; log-confirm before file observation. Retain actual counterexample trace for every named invariant.",
+      "receipt_material": "TLC config/versions/configuration coverage/deadlock policy, TLAPS proofs/backends, transition-to-code map, mutants."
+    },
+    {
+      "id": "SG08",
+      "title": "Owner service and authority",
+      "owner": "Writfold and Splicery owners",
+      "requires": [
+        "SG06",
+        "SG07"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Owner-published pinned schema and vectors. Real initialized stdio, verified grant/scope and dirty-worktree snapshot; replay/validate exact recipe for attributed receipts. Real plan/run/Worktrunk binding. Report actual existing owner gate prerequisites and blockers.",
+      "negative_controls": "Cross-realm/cross-client handles, forged recipe-to-IR, mocked grant, read-only capture as write target, wrong repo, expired prepare/owner and unsupported capability.",
+      "receipt_material": "Actual installable artifacts and owner receipts, handshake transcripts sanitized for secrets, valid and denied runs."
+    },
+    {
+      "id": "SG09",
+      "title": "Native WSL file effects",
+      "owner": "Adapter owner",
+      "requires": [
+        "SG08"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Actual descriptor-contained read/compare/install, mode-safe replacement, correct temp/rename/fsync lifecycle, fresh handle/receipt and no-change/no-write result. Verify effective reservation and quiescence under the declared writer model.",
+      "negative_controls": "Symlink race, hard link, special file, stale digest with unchanged excerpt, path escape, old FD, ENOSPC/short write, read-only parent, formatter drift, unsafe metadata profile.",
+      "receipt_material": "Real WSL filesystem and Worktrunk evidence, before/after bytes/metadata and syscall fault evidence."
+    },
+    {
+      "id": "SG10",
+      "title": "Crash, retry and Run Watch",
+      "owner": "Host owner",
+      "requires": [
+        "SG09"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Kill actual adapter/host at each durable boundary, restart and reconcile under same EffectId or block. Acks and TUI bind to exact outcome and head; selection/rendering has zero effect. Different sessions reuse only verified durable bindings.",
+      "negative_controls": "Lost response, two concurrent applies with same key, reused key with changed intent, altered host generation, crash after rename/before dir sync, lagged activity projection, stale receipt.",
+      "receipt_material": "Fault matrix, event/ref counts, zero second logical dispatch, retained unknown paths, independently observed content."
+    },
+    {
+      "id": "SG11",
+      "title": "File lifecycle and multi-repository visibility",
+      "owner": "Adapter and QA owners",
+      "requires": [
+        "SG10"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Open real absent/existing cases for create/remove/rename with explicit path and freshness guards. Multi-file/repo recipes orchestrated as distinct effects, report exact applied prefix. Demonstrate one failed file does not turn run green.",
+      "negative_controls": "Create races with another create; rename target appears, cross-device rename, stale removal, ACL/linked file, denied repo B after A succeeded, unknown first effect on replay.",
+      "receipt_material": "Native outcomes, partial/failure receipts and TUI snapshots, authority and retention checks."
+    },
+    {
+      "id": "SG12",
+      "title": "Whole-language conformance and agent usability",
+      "owner": "Evaluation owner",
+      "requires": [
+        "SG06",
+        "SG10",
+        "SG11"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Freeze complete task corpus and labels before trial. Compare agent's current editor/patch tooling against Splicery on matched held-out tasks. Every normative syntax form exercised from raw recipe to actual observed file or documented refusal. Include all 5 anchor tasks, multiple file formats and a genuine binary fixture.",
+      "negative_controls": "Seed duplicate regions, stale formatter edit, Unicode/CRLF/no final LF, tempting regeneration of comments, misordered marker pair, hidden unrelated file. Hidden checks must detect a corrupted candidate.",
+      "receipt_material": "Exact task/seed/model/harness/token meter, successful completions, wrong-target rate, retries, bytes resent, input/output tokens, time and correction logs."
+    },
+    {
+      "id": "SG13",
+      "title": "Artifact, runtime and offline reproduction",
+      "owner": "Release engineer",
+      "requires": [
+        "SG06",
+        "SG08",
+        "SG11"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Static Linux x86_64 musl client, exact pinned compatible adapter, SBOM/licenses, reproducible source inputs, deterministic outputs or explained differences, cold offline rebuild, clean runtime smoke without build tools.",
+      "negative_controls": "Invoke with missing/degraded host, incompatible protocol, stale cached artifact, compromised tool lock, missing external storage or proof tools on runtime PATH. No fallback to shell writer.",
+      "receipt_material": "Binary and image hashes, ELF/runtime inspection, install smoke, SBOM, cold build and disclosure of any reproducibility variance."
+    },
+    {
+      "id": "SG14",
+      "title": "Independent release decision",
+      "owner": "Release owner",
+      "requires": [
+        "SG00",
+        "SG01",
+        "SG02",
+        "SG03",
+        "SG04",
+        "SG05",
+        "SG06",
+        "SG07",
+        "SG08",
+        "SG09",
+        "SG10",
+        "SG11",
+        "SG12",
+        "SG13"
+      ],
+      "required": true,
+      "status": "not_run",
+      "pass_criteria": "Every mandatory gate at matching /1 scope passed against the release closure. Independent reviewer traces a recipe to actual retained bytes, theorem and receipt. All failing/blocked paths and counterexamples have a disposition.",
+      "negative_controls": "Remove/alter a predecessor receipt, change crate feature/fixture/profile, replace test binary with mock, mark skipped gate pass. Aggregate must refuse.",
+      "receipt_material": "Signed/admitted release decision as applicable, immutable evidence index and compatibility/limits note."
+    }
+  ]
+}

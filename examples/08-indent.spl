@@ -1,0 +1,4 @@
+edit "docs/example.txt" {
+  @body := range [0,6)
+  replace @body with indent("  ", keep(@body))
+}

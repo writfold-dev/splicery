@@ -1,0 +1,6 @@
+edit "docs/names.txt" {
+  @left := one text "alpha"
+  @right := one text "beta"
+  replace @left with keep(@right)
+  replace @right with keep(@left)
+}
