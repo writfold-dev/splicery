@@ -30,6 +30,66 @@ pub struct SourceSpan {
     hi: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ReadCapture {
+    lo: usize,
+    hi: usize,
+}
+
+impl ReadCapture {
+    pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
+        if lo <= hi && hi <= image_len {
+            Some(Self { lo, hi })
+        } else {
+            None
+        }
+    }
+
+    pub fn insertion(image_len: usize, at: usize) -> Option<Self> {
+        Self::new(image_len, at, at)
+    }
+
+    pub fn lo(self) -> usize {
+        self.lo
+    }
+    pub fn hi(self) -> usize {
+        self.hi
+    }
+    pub fn width(self) -> usize {
+        self.hi - self.lo
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EditTarget {
+    lo: usize,
+    hi: usize,
+}
+
+impl EditTarget {
+    pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
+        if lo <= hi && hi <= image_len {
+            Some(Self { lo, hi })
+        } else {
+            None
+        }
+    }
+
+    pub fn insertion(image_len: usize, at: usize) -> Option<Self> {
+        Self::new(image_len, at, at)
+    }
+
+    pub fn lo(self) -> usize {
+        self.lo
+    }
+    pub fn hi(self) -> usize {
+        self.hi
+    }
+    pub fn width(self) -> usize {
+        self.hi - self.lo
+    }
+}
+
 impl SourceSpan {
     pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
         if lo <= hi && hi <= image_len {
@@ -93,7 +153,7 @@ pub enum Part {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Splice {
-    pub target: SourceSpan,
+    pub target: EditTarget,
     pub replacement: Vec<Part>,
     pub origin: RecipeSpan,
 }
@@ -101,7 +161,7 @@ pub struct Splice {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaptureBinding {
     pub name: String,
-    pub span: SourceSpan,
+    pub span: ReadCapture,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

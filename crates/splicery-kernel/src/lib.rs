@@ -1,29 +1,11 @@
-use splicery_domain::{
-    MAX_CANDIDATE_BYTES, MAX_PAYLOAD_BYTES, MAX_SPLICES, OriginalImage, Part, Profile, RecipeSpan,
-    SourceSpan, Splice,
-};
+use splicery_domain::{EditTarget, OriginalImage, Part, Profile, RecipeSpan, SourceSpan, Splice};
 #[cfg(verus_keep_ghost)]
 use vstd::assert_seqs_equal;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum KernelError {
-    OutOfBounds,
-    Overlap,
-    TooManySplices,
-    PayloadTooLarge,
-    CandidateTooLarge,
-    InvalidUtf8Boundary,
-    NoChange,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EditReport {
-    pub target: SourceSpan,
-    pub replacement: Vec<u8>,
-    pub origin: RecipeSpan,
-}
+mod spec;
+use spec::{candidate_len, emit_gaps, materialize};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Candidate {
@@ -55,7 +37,7 @@ pub struct PreparedBatch {
 
 impl PreparedBatch {
     pub fn new(image: OriginalImage, mut splices: Vec<Splice>) -> Result<Self, KernelError> {
-        if splices.len() > MAX_SPLICES {
+        if splices.len() > 4096 {
             return Err(KernelError::TooManySplices);
         }
         let mut payload_bytes = 0usize;
@@ -64,7 +46,7 @@ impl PreparedBatch {
             payload_bytes = payload_bytes
                 .checked_add(replacement_bytes)
                 .ok_or(KernelError::PayloadTooLarge)?;
-            if payload_bytes > MAX_PAYLOAD_BYTES {
+            if payload_bytes > 16 * 1024 * 1024 {
                 return Err(KernelError::PayloadTooLarge);
             }
         }
@@ -103,94 +85,50 @@ fn validate_span(image: &OriginalImage, span: SourceSpan) -> Result<(), KernelEr
     Ok(())
 }
 
-fn replacement_len(splice: &Splice) -> Result<usize, KernelError> {
-    let mut length = 0usize;
-    for part in &splice.replacement {
-        let part_len = match part {
-            Part::Literal(bytes) => bytes.len(),
-            Part::Copy(span) => span.width(),
-        };
-        length = length
-            .checked_add(part_len)
-            .ok_or(KernelError::PayloadTooLarge)?;
-        if length > MAX_PAYLOAD_BYTES {
-            return Err(KernelError::PayloadTooLarge);
+fn validate_target(image: &OriginalImage, target: EditTarget) -> Result<(), KernelError> {
+    let bytes = image.bytes();
+    if target.lo() > target.hi() || target.hi() > bytes.len() {
+        return Err(KernelError::OutOfBounds);
+    }
+    if image.profile() == Profile::Text {
+        let text = std::str::from_utf8(bytes).map_err(|_| KernelError::InvalidUtf8Boundary)?;
+        if !text.is_char_boundary(target.lo()) || !text.is_char_boundary(target.hi()) {
+            return Err(KernelError::InvalidUtf8Boundary);
         }
     }
-    Ok(length)
+    Ok(())
 }
 
 fn validate_splice(image: &OriginalImage, splice: &Splice) -> Result<usize, KernelError> {
-    validate_span(image, splice.target)?;
+    validate_target(image, splice.target)?;
     for part in &splice.replacement {
         if let Part::Copy(span) = part {
             validate_span(image, *span)?;
         }
     }
-    replacement_len(splice)
-}
-
-fn candidate_len(batch: &PreparedBatch) -> Result<usize, KernelError> {
-    let mut length = batch.image.bytes().len();
-    for splice in &batch.splices {
-        let replacement_bytes = replacement_len(splice)?;
-        length = length
-            .checked_sub(splice.target.width())
-            .and_then(|value| value.checked_add(replacement_bytes))
-            .ok_or(KernelError::CandidateTooLarge)?;
-    }
-    if length > MAX_CANDIDATE_BYTES {
-        return Err(KernelError::CandidateTooLarge);
-    }
-    Ok(length)
-}
-
-fn materialize(image: &OriginalImage, splice: &Splice) -> Result<Vec<u8>, KernelError> {
-    let mut replacement = Vec::with_capacity(replacement_len(splice)?);
-    for part in &splice.replacement {
-        match part {
-            Part::Literal(bytes) => replacement.extend_from_slice(bytes),
-            Part::Copy(span) => {
-                replacement.extend_from_slice(&image.bytes()[span.lo()..span.hi()]);
-            }
-        }
-    }
-    Ok(replacement)
-}
-
-fn emit_gaps(input: &[u8], edits: &[EditReport], output_len: usize) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(output_len);
-    let mut cursor = 0usize;
-    for edit in edits {
-        bytes.extend_from_slice(&input[cursor..edit.target.lo()]);
-        bytes.extend_from_slice(&edit.replacement);
-        cursor = edit.target.hi();
-    }
-    bytes.extend_from_slice(&input[cursor..]);
-    bytes
+    spec::replacement_len(image.bytes(), splice)
 }
 
 pub fn render(batch: &PreparedBatch) -> Result<Candidate, KernelError> {
-    let output_len = candidate_len(batch)?;
-    let mut edits = Vec::with_capacity(batch.splices.len());
-    for splice in &batch.splices {
-        edits.push(EditReport {
-            target: splice.target,
-            replacement: materialize(&batch.image, splice)?,
-            origin: splice.origin,
-        });
-    }
     let input = batch.image.bytes();
-    let bytes = if let [edit] = edits.as_slice() {
-        apply_at(
+    let output_len = candidate_len(input, &batch.splices)?;
+    let (bytes, edits) = if let [splice] = batch.splices.as_slice() {
+        let replacement = materialize(input, splice)?;
+        let bytes = apply_at(
             input,
-            edit.target.lo(),
-            edit.target.width(),
-            &edit.replacement,
+            splice.target.lo(),
+            splice.target.width(),
+            &replacement,
         )
-        .ok_or(KernelError::OutOfBounds)?
+        .ok_or(KernelError::OutOfBounds)?;
+        let edits = vec![EditReport {
+            target: splice.target,
+            replacement,
+            origin: splice.origin,
+        }];
+        (bytes, edits)
     } else {
-        emit_gaps(input, &edits, output_len)
+        emit_gaps(input, &batch.splices, output_len)?
     };
     if batch.image.profile() == Profile::Text && std::str::from_utf8(&bytes).is_err() {
         return Err(KernelError::InvalidUtf8Boundary);
@@ -205,22 +143,39 @@ pub fn render(batch: &PreparedBatch) -> Result<Candidate, KernelError> {
 
 vstd::prelude::verus! {
 
+pub open spec fn seq_len<T>(items: Seq<T>) -> int {
+    items.len() as int
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KernelError {
+    OutOfBounds, Overlap, TooManySplices, PayloadTooLarge, CandidateTooLarge,
+    InvalidUtf8Boundary, NoChange,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EditReport {
+    pub target: EditTarget,
+    pub replacement: Vec<u8>,
+    pub origin: RecipeSpan,
+}
+
 /// Replace exactly `width` bytes at `lo`, refusing invalid cuts and oversized output.
 pub fn apply_at(input: &[u8], lo: usize, width: usize, replacement: &[u8])
     -> (result: Option<Vec<u8>>)
     requires
-        input@.len() <= 8 * 1024 * 1024,
-        replacement@.len() <= 16 * 1024 * 1024,
+        seq_len(input@) <= 8 * 1024 * 1024,
+        seq_len(replacement@) <= 16 * 1024 * 1024,
     ensures
         match result {
             Some(output) => {
-                lo as int <= input@.len()
-                && width as int <= input@.len() - lo as int
-                && output@.len() == input@.len() - width as int + replacement@.len()
-                && output@.len() <= 16 * 1024 * 1024
+                lo as int <= seq_len(input@)
+                && width as int <= seq_len(input@) - lo as int
+                && seq_len(output@) == seq_len(input@) - width as int + seq_len(replacement@)
+                && seq_len(output@) <= 16 * 1024 * 1024
                 && output@ == input@.subrange(0, lo as int)
                     + replacement@
-                    + input@.subrange(lo as int + width as int, input@.len() as int)
+                    + input@.subrange(lo as int + width as int, seq_len(input@) as int)
             },
             None => true,
         },
@@ -240,7 +195,7 @@ pub fn apply_at(input: &[u8], lo: usize, width: usize, replacement: &[u8])
         assert_seqs_equal!(
             output@ == input@.subrange(0, lo as int)
                 + replacement@
-                + input@.subrange(lo as int + width as int, input@.len() as int)
+                + input@.subrange(lo as int + width as int, seq_len(input@) as int)
         );
     }
     Some(output)
@@ -257,7 +212,7 @@ mod tests {
     }
 
     fn splice(lo: usize, hi: usize, replacement: Vec<Part>) -> Result<Splice, KernelError> {
-        let target = SourceSpan::new(usize::MAX, lo, hi).ok_or(KernelError::OutOfBounds)?;
+        let target = EditTarget::new(usize::MAX, lo, hi).ok_or(KernelError::OutOfBounds)?;
         let origin = RecipeSpan { start: 0, end: 1 };
         Ok(Splice {
             target,

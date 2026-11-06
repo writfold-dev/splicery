@@ -1,6 +1,12 @@
 use splicery_domain::MAX_REPORT_BYTES;
 use splicery_kernel::Candidate;
 
+mod file_plan;
+mod frozen;
+
+pub use file_plan::encode_file_plan;
+pub use frozen::{PROFILE_ID, capture_digest, encode_frozen, parse_frozen};
+
 pub fn parse_nat(text: &str) -> Option<usize> {
     if text.is_empty() || (text.len() > 1 && text.starts_with('0')) {
         return None;
@@ -81,3 +87,6 @@ pub fn report(path: &str, candidate: &Candidate) -> Result<String, String> {
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests;
