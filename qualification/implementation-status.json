@@ -3,7 +3,7 @@
   "scope": "Mutable Splicery implementation status; qualification/gates.json remains the immutable not_run release registry",
   "release_profile": "/1",
   "release_status": "not_qualified",
-  "source_commit_for_final_evidence": "55702db",
+  "source_commit_for_final_evidence": "eb57c23",
   "components": {
     "handover_import": {
       "status": "passed_initial_component_check",
