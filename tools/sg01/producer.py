@@ -708,3 +708,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return producer.execute()
     except Exception as exc:
         return producer.abort(exc)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
