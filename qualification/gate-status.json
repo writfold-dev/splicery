@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "gates": {
-    "SG00": {"status": "pass", "receipts": ["sg00-final-001/receipt.json", "preflight-final-001/receipt.json", "reproduction-final-001/receipt.json"]},
+    "SG00": {"status": "pass", "receipts": ["preflight-final-001/preflight-receipt.json", "reproduction-final-001/reproduction-receipt.json"]},
     "SG01": {"status": "pass", "receipts": ["sg01-final-001/receipt.json"]},
     "SG02": {"status": "pass", "receipts": ["proofs-final-001/proof-receipt.json"]},
     "SG03": {"status": "pass", "receipts": ["authority-final-001/receipt.json"]},
