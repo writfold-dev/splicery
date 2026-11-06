@@ -12,6 +12,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 from evidence import capture_sources, digest, manifest, process_env, require_success, run_logged, write_new
+from evidence_identity import source_identity
 from preflight import observe
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -223,7 +224,7 @@ def build(attempt: Path, lock: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("gate", choices=["bootstrap", "lean", "build"])
+    parser.add_argument("gate", choices=["bootstrap", "lean", "authority", "build"])
     parser.add_argument("--receipt", required=True, type=Path,
                         help="fresh file in a new out-of-tree attempt directory")
     args = parser.parse_args()
@@ -237,12 +238,18 @@ def main() -> int:
         parser.error("the receipt parent must be a fresh directory; prior evidence is never overwritten")
     attempt.chmod(0o700)
     record: dict[str, object] = {
-        "schema_version": 1, "gate": args.gate, "status": "fail",
+        "schema_version": 1,
+        "gate": {"bootstrap": "SG00", "lean": "SG02", "authority": "SG03", "build": "SG00"}[args.gate],
+        "producer_gate": args.gate,
+        "status": "fail",
+        "source_identity": source_identity(ROOT),
         "scope": {
             "bootstrap": "sg00-splicery-tool-admission-only",
             "lean": "splicery-lean-calculus-and-primitive-oracle-component",
+            "authority": "splicery-authority-and-primitive-oracle-component",
             "build": "sg00-splicery-locked-offline-static-musl-build-only",
         }[args.gate],
+        "gate_id": {"bootstrap": "SG00", "lean": "SG02", "authority": "SG03", "build": "SG00"}[args.gate],
         "skipped": [],
     }
     try:
@@ -258,12 +265,14 @@ def main() -> int:
         record["tool_lock_sha256"] = digest(ROOT / "toolchains.lock.json")
         if args.gate == "bootstrap":
             record["result"] = bootstrap(attempt, lock)
-        elif args.gate == "lean":
+        elif args.gate in {"lean", "authority"}:
             record["result"] = lean(attempt, lock)
         else:
             record["result"] = build(attempt, lock)
         if record["producer_inputs"] != manifest(ROOT, producer_inputs):
             raise ValueError("qualification producer changed while executing")
+        if record["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during qualification")
         record["status"] = "pass"
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError) as error:
         record["error"] = f"{type(error).__name__}: {error}"

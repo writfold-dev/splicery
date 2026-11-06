@@ -15,6 +15,9 @@ import sys
 import time
 from typing import Any, Iterator, Optional, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from evidence_identity import source_identity
+
 from .errors import MAX_DIAGNOSTIC_CONTEXT, MAX_DIAGNOSTIC_MESSAGE, RecipeError
 from .lexer import KEYWORDS, MAX_NAT, MAX_RECIPE_BYTES, Lexer, LexerConfig, Token
 from .parser import DEFAULT_MAX_DEPTH, Parser, ParserConfig
@@ -551,6 +554,7 @@ class Producer:
         return {
             "schema_version": SCHEMA_VERSION,
             "gate": "SG01",
+            "source_identity": source_identity(repository),
             "component": "independent_grammar_lexer_qualification",
             "scope": {
                 "syntax_and_lexing": "assessed",

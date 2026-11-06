@@ -6,7 +6,7 @@ VARIABLES phase, file, base, owner, stamp, grant, nwrite, observed
 vars == <<phase, file, base, owner, stamp, grant, nwrite, observed>>
 Phases == {"idle","ready","claimed","wrote","unknown","confirmed","refused"}
 Init == /\ phase = "idle" /\ file = 0 /\ base = 0 /\ owner = 0
-        /\ stamp = 0 /\ grant /\ nwrite = 0 /\ ~observed
+        /\ stamp = 0 /\ grant = TRUE /\ nwrite = 0 /\ ~observed
 Prepare == /\ phase = "idle" /\ grant /\ file # 2
            /\ phase' = "ready" /\ base' = file /\ stamp' = owner
            /\ UNCHANGED <<file,owner,grant,nwrite,observed>>

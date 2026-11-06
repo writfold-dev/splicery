@@ -9,8 +9,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 
 
 def load_evidence():
@@ -44,7 +47,8 @@ def main() -> int:
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     evidence = load_evidence()
     inputs = evidence.manifest(ROOT, ["."])
-    record = {"schema_version": 1, "scope": "two cold offline musl rebuilds only",
+    record = {"schema_version": 1, "gate": "SG00", "source_identity": source_identity(ROOT),
+              "scope": "two cold offline musl rebuilds only",
               "status": "failed", "source_manifest": inputs}
     try:
         registry = output / "registry"
@@ -77,6 +81,8 @@ def main() -> int:
             raise ValueError(f"cold builds differ: {hashes}")
         if inputs != evidence.manifest(ROOT, ["."]):
             raise ValueError("source changed during cold reproduction")
+        if record["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during reproduction")
         record.update({"status": "passed_cold_offline_reproduction_component",
                        "artifact_sha256": hashes[0], "rebuilt_artifact_sha256": hashes[1]})
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:

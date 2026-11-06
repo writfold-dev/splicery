@@ -7,8 +7,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 CASES = [
     (["apply", "1", "1", "616263", "5858"], 0, "61585863"),
     (["apply", "0", "0", "", "00"], 0, "00"),
@@ -45,7 +48,8 @@ def main() -> int:
     if output.is_relative_to(ROOT) or output.exists():
         parser.error("use a fresh evidence directory outside the source tree")
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
-    record = {"schema_version": 1, "scope": "Lean/Rust primitive success-and-refusal differential",
+    record = {"schema_version": 1, "gate": "SG05", "source_identity": source_identity(ROOT),
+              "scope": "Lean/Rust primitive success-and-refusal differential",
               "status": "failed", "rust_binary_sha256": digest(binary), "cases": []}
     try:
         for arguments, expected_status, expected_stdout in CASES:
@@ -58,6 +62,8 @@ def main() -> int:
                 record["cases"].append(case)
                 raise ValueError(f"differential disagreement for {arguments}")
             record["cases"].append(case)
+        if record["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during differential qualification")
         record["status"] = "passed_primitive_differential_component"
     except (OSError, ValueError, UnicodeError, subprocess.SubprocessError) as error:
         record["error"] = f"{type(error).__name__}: {error}"

@@ -37,6 +37,8 @@ from typing import Any
 from byte_reference import Refusal, Span, apply as byte_apply
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 MASTER_SEED = 0x534730365F4F4646
 RAW_CASE_COUNT = 2048
 MAX_RECIPE_BYTES = 256 * 1024
@@ -1003,7 +1005,8 @@ def main() -> int:
     evidence.mkdir(parents=True, mode=0o700, exist_ok=False)
     started = time.monotonic()
     receipt: dict[str, Any] = {
-        "schema_version": 1, "scope": "SG06 offline differential fuzz and bounded execution component",
+        "schema_version": 1, "gate": "SG06", "source_identity": source_identity(ROOT),
+        "scope": "SG06 offline differential fuzz and bounded execution component",
         "status": "failed", "master_seed": MASTER_SEED,
         "command": sys.orig_argv, "binary": None,
         "ceilings": {"measured_wall_seconds": RESOURCE_WALL_CEILING_SECONDS,
@@ -1050,6 +1053,8 @@ def main() -> int:
         }
         if receipt["counts"]["deterministic_raw_cases"] < 2000:
             raise ValueError("internal error: fewer than 2000 deterministic raw cases")
+        if receipt["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during fuzz qualification")
         if not receipt["failures"]:
             receipt["status"] = "passed_sg06_offline_fuzz_resource_component"
         else:

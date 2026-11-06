@@ -7,8 +7,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 TARGETS = {
     "01-await": "sdk/src/client.rs",
     "02-wrap": "sdk/src/driver.rs",
@@ -43,7 +46,8 @@ def main() -> int:
     work = evidence / "work"
     work.mkdir(parents=True)
     vectors = json.loads((ROOT / "qualification/recipe-vectors.json").read_text())
-    receipt = {"schema_version": 1, "scope": "complete offline /1 language component",
+    receipt = {"schema_version": 1, "gate": "SG04", "source_identity": source_identity(ROOT),
+               "scope": "complete offline /1 language component",
                "status": "failed", "cases": []}
 
     def case(name: str, arguments: list[str], status: int, expected: bytes | None) -> dict:
@@ -128,6 +132,8 @@ def main() -> int:
         bad_regex = work / "bad-regex.spl"
         bad_regex.write_text('edit "service/config/routes.conf" { each @r in line_matches rx"(?i)route" expect 1 { delete @r } }')
         case("inline_flag_refusal", ["preview", "--root", str(work), str(bad_regex)], 2, None)
+        if receipt["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during language qualification")
         receipt["status"] = "passed_complete_offline_language_component"
     except (OSError, ValueError, KeyError, IndexError, json.JSONDecodeError) as error:
         receipt["error"] = f"{type(error).__name__}: {error}"

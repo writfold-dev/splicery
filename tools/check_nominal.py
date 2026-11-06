@@ -12,19 +12,22 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 
 VALID_SIBLINGS = r"""
-use splicery_domain::{CaptureBinding, EditTarget, Part, ReadCapture, RecipeSpan, SourceSpan, Splice};
+use splicery_domain::{CaptureBinding, EditTarget, OriginalImage, Part, ReadCapture, RecipeSpan, SourceSpan, Splice};
 
-pub fn valid_siblings(image_len: usize, lo: usize, hi: usize, start: usize, end: usize)
+pub fn valid_siblings(image: &OriginalImage, lo: usize, hi: usize, start: usize, end: usize)
     -> Option<(SourceSpan, ReadCapture, CaptureBinding, Splice)>
 {
-    let source = SourceSpan::new(image_len, lo, hi)?;
-    let capture = ReadCapture::new(image_len, lo, hi)?;
-    let insertion = EditTarget::insertion(image_len, lo)?;
-    let target = EditTarget::new(image_len, insertion.lo(), insertion.hi())?;
+    let source = SourceSpan::new(image, lo, hi)?;
+    let capture = ReadCapture::new(image, lo, hi)?;
+    let insertion = EditTarget::insertion(image, lo)?;
+    let target = EditTarget::new(image, insertion.lo(), insertion.hi())?;
     let splice = Splice {
         target,
         replacement: vec![Part::Copy(source)],
@@ -131,7 +134,7 @@ use splicery_domain::{EditTarget, RecipeSpan};
 pub fn forge(origin: RecipeSpan) -> Option<EditTarget> { EditTarget::new(origin, 0, 0) }
 """,
         "E0308",
-        ["expected `usize`, found `RecipeSpan`"],
+        ["expected `&OriginalImage`, found `RecipeSpan`"],
     ),
     "read_capture_new_source_span_argument": (
         r"""
@@ -139,7 +142,7 @@ use splicery_domain::{ReadCapture, SourceSpan};
 pub fn forge(span: SourceSpan) -> Option<ReadCapture> { ReadCapture::new(span, 0, 0) }
 """,
         "E0308",
-        ["expected `usize`, found `SourceSpan`"],
+        ["expected `&OriginalImage`, found `SourceSpan`"],
     ),
     "source_span_new_edit_target_argument": (
         r"""
@@ -147,7 +150,7 @@ use splicery_domain::{EditTarget, SourceSpan};
 pub fn forge(target: EditTarget) -> Option<SourceSpan> { SourceSpan::new(target, 0, 0) }
 """,
         "E0308",
-        ["expected `usize`, found `EditTarget`"],
+        ["expected `&OriginalImage`, found `EditTarget`"],
     ),
 }
 
@@ -203,6 +206,8 @@ def main() -> int:
     artifacts.mkdir()
     receipt = {
         "schema_version": 1,
+        "gate": "SG04",
+        "source_identity": source_identity(ROOT),
         "scope": "nominal read/edit capability and coordinate-unit APIs",
         "status": "failed",
         "domain_rlib": str(rlib),
@@ -230,6 +235,8 @@ def main() -> int:
         compile_case("valid_siblings", VALID_SIBLINGS, None, [])
         for name, (source, code, fragments) in EXPECTED_FAILURES.items():
             compile_case(name, source, code, fragments)
+        if receipt["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during nominal qualification")
         receipt["status"] = "passed_nominal_compile_fixtures"
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         receipt["error"] = f"{type(error).__name__}: {error}"

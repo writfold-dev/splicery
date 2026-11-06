@@ -17,6 +17,9 @@ services:
       CARGO_NET_OFFLINE: "true"
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static
       PYTHONDONTWRITEBYTECODE: "1"
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /work/splicery
     volumes:
       - type: bind
         source: .

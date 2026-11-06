@@ -9,8 +9,11 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 PERMITTED_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
 FORBIDDEN = re.compile(r"\b(sorry|admit|native_decide)\b|^\s*(?:axiom|unsafe|opaque)\b", re.MULTILINE)
 THEOREM = re.compile(r"^theorem\s+([A-Za-z_][A-Za-z0-9_'.]*)", re.MULTILINE)
@@ -345,7 +348,8 @@ def main() -> int:
     if destination.is_relative_to(ROOT) or destination.exists():
         parser.error("use a fresh evidence directory outside the source checkout")
     destination.mkdir(parents=True, exist_ok=False)
-    record: dict = {"schema_version": 1, "scope": "Splicery Lean calculus and bounded primitive oracle",
+    record: dict = {"schema_version": 1, "gate": "SG02", "source_identity": source_identity(ROOT),
+                    "scope": "Splicery Lean calculus and bounded primitive oracle",
                     "status": "failed", "mutants": []}
     try:
         lean = shutil.which("lean")
@@ -557,6 +561,8 @@ end Splicery.Mutants
                 if record["sources"].get(relative) != final_sources.get(relative)
             }
             raise ValueError("proof sources changed during qualification")
+        if record["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during proof qualification")
         record["status"] = "passed_calculus_component"
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         record["error"] = f"{type(error).__name__}: {error}"

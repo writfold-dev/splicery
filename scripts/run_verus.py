@@ -9,8 +9,11 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from evidence_identity import source_identity
 REQUIRED = (
     "splicery_kernel::apply_at",
     "splicery_kernel::spec::replacement_len",
@@ -113,7 +116,8 @@ def main() -> int:
     if output.is_relative_to(ROOT) or output.exists():
         parser.error("use a fresh evidence directory outside the source tree")
     output.mkdir(parents=True, mode=0o755, exist_ok=False)
-    record = {"schema_version": 2, "scope": "actual normalized-batch Verus production bodies",
+    record = {"schema_version": 2, "gate": "SG05", "source_identity": source_identity(ROOT),
+              "scope": "actual normalized-batch Verus production bodies",
               "status": "failed", "sources": sources(ROOT)}
     try:
         trusted_path = ROOT / "qualification/verus-trusted-base.json"
@@ -188,6 +192,8 @@ def main() -> int:
                       and report["functions"].get(target_function) is False]
             if negative["exit_status"] == 0 or len(failed) != 1:
                 raise ValueError(f"{mutant_name} did not fail {target_function} as intended")
+        if record["source_identity"] != source_identity(ROOT):
+            raise ValueError("checkout identity changed during Verus qualification")
         record["status"] = "passed_verus_normalized_batch_component"
     except (OSError, ValueError, UnicodeError, subprocess.SubprocessError) as error:
         record["error"] = f"{type(error).__name__}: {error}"
