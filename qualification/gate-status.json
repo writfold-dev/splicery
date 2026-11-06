@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "gates": {
+    "SG00": {"status": "pass", "receipts": ["sg00-final-001/receipt.json", "preflight-final-001/receipt.json", "reproduction-final-001/receipt.json"]},
+    "SG01": {"status": "pass", "receipts": ["sg01-final-001/receipt.json"]},
+    "SG02": {"status": "pass", "receipts": ["proofs-final-001/proof-receipt.json"]},
+    "SG03": {"status": "pass", "receipts": ["authority-final-001/receipt.json"]},
+    "SG04": {"status": "pass", "receipts": ["language-final-001/receipt.json", "nominal-final-001/receipt.json"]},
+    "SG05": {"status": "pass", "receipts": ["verus-final-001/verus-receipt.json", "differential-final-001/differential-receipt.json"]},
+    "SG06": {"status": "pass", "receipts": ["fuzz-final-001/fuzz-receipt.json"]},
+    "SG07": {"status": "pass", "receipts": ["sg07-final-001/model-receipt.json"]},
+    "SG08": {"status": "blocked", "blockers": ["owner-published shared-stdio contract artifact", "real Worktrunk/native-effect receipts"]},
+    "SG09": {"status": "blocked", "blockers": ["native WSL descriptor/materializer evidence requires SG08"]},
+    "SG10": {"status": "blocked", "blockers": ["real adapter crash/retry and Run Watch evidence requires SG09"]},
+    "SG11": {"status": "blocked", "blockers": ["native lifecycle and multi-repository evidence requires SG10"]},
+    "SG12": {"status": "blocked", "blockers": ["held-out two-harness benchmark requires SG06, SG10 and SG11"]},
+    "SG13": {"status": "blocked", "blockers": ["release reproduction and compatible adapter evidence requires SG06, SG08 and SG11"]},
+    "SG14": {"status": "blocked", "blockers": ["independent release decision requires SG00-SG13"]}
+  }
+}

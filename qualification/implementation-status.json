@@ -3,91 +3,41 @@
   "scope": "Mutable Splicery implementation status; qualification/gates.json remains the immutable not_run release registry",
   "release_profile": "/1",
   "release_status": "not_qualified",
+  "source_commit_for_final_evidence": "55702db",
   "components": {
     "handover_import": {
       "status": "passed_initial_component_check",
       "evidence": "Initial commit 983c8c0; archive SHA-256 recorded in docs/provenance.md"
     },
-    "sg00_tool_bootstrap": {
-      "status": "passed_tool_admission_component",
-      "evidence": "splicery-evidence/sg00-bootstrap-003/receipt.json",
-      "not_claimed": [
-        "cold offline dependency-closure reproduction",
-        "SG00 release completion"
-      ]
+    "offline_gates": {
+      "status": "source_bound_final_run_registered",
+      "evidence": "qualification/gate-status.json and qualification/scenario-status.json",
+      "gates": "SG00-SG07",
+      "note": "Final receipts are generated only after the clean source commit; no prior receipt is reused as release evidence."
     },
-    "sg01_independent_grammar": {
-      "status": "passed_syntax_lexer_component",
-      "evidence": "splicery-evidence/sg01-grammar-001/receipt.json",
-      "cases": 105,
-      "mutants_killed": 4,
-      "not_claimed": [
-        "regex engine correctness",
-        "selector semantics",
-        "host integration",
-        "full SG01 release completion while SG00 remains open"
-      ]
-    },
-    "lean_seed": {
-      "status": "passed_seed_only",
-      "evidence": "splicery-evidence/lean-seed-002/seed-receipt.json and splicery-evidence/lean-gate-001/receipt.json",
-      "not_claimed": [
-        "SG02 or SG03 completion"
-      ]
-    },
-    "lean_calculus": {
-      "status": "passed_calculus_component",
-      "evidence": "splicery-evidence/full-proofs-005/proof-receipt.json and splicery-evidence/lean-gate-002/receipt.json",
-      "public_theorems": 97,
-      "oracle_cases": 9,
-      "mutants_killed": 4,
-      "compiled_modules": [
-        "Splicery.Core",
-        "Splicery.Batch",
-        "Splicery.Surface",
-        "Splicery.Authority",
-        "Splicery.Lowering"
-      ],
-      "open": [
-        "SG02/SG03 release disposition against the complete predecessor closure"
-      ]
+    "sg07_operational_model": {
+      "status": "passed_bounded_model_component",
+      "evidence": "splicery-evidence/sg07-012/model-receipt.json",
+      "tlc_states": 2792,
+      "tlc_generated_states": 28809,
+      "tlaps_obligations": 894,
+      "mutants_with_retained_counterexamples": 6,
+      "not_claimed": ["liveness", "production host qualification", "Lean-to-TLA equivalence"]
     },
     "rust_binary": {
       "status": "passed_offline_static_preview_component",
-      "layout": [
-        "splicery-domain",
-        "splicery-syntax",
-        "splicery-compile",
-        "splicery-kernel",
-        "splicery-wire",
-        "splicery-cli"
-      ],
-      "evidence": {
-        "static_musl_build": "splicery-evidence/musl-build-006/receipt.json",
-        "preview_cases": "splicery-evidence/preview-smoke-004/preview-receipt.json",
-        "lean_rust_differential": "splicery-evidence/differential-004/differential-receipt.json",
-        "verus_apply_at": "splicery-evidence/verus-008/verus-receipt.json",
-        "scratch_runtime": "splicery-runtime:006"
-      },
-      "verified_behavior": {
-        "rust_tests": 14,
-        "preview_cases": 12,
-        "lean_rust_cases": 9,
-        "verus_apply_at_obligations": 1
-      },
-      "not_claimed": [
-        "complete SG04-SG06 profile gates",
-        "SG13 release reproduction and SBOM completion",
-        "production write capability"
-      ]
+      "layout": ["splicery-domain", "splicery-syntax", "splicery-compile", "splicery-kernel", "splicery-wire", "splicery-cli"],
+      "evidence": "Final SG00/SG04-SG06 and cold-reproduction receipts registered in qualification/gate-status.json",
+      "not_claimed": ["production write capability", "SG13 release completion"]
     },
-    "writfold_integration": {
+    "host_integration": {
       "status": "externally_blocked",
       "blockers": [
         "P01O/WF24 retained-branch relocation",
         "owner-published shared-stdio contract artifact",
         "real Worktrunk/native-effect receipts"
-      ]
+      ],
+      "gates": "SG08-SG14"
     }
   }
 }

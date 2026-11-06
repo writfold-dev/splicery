@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "scenarios": {
+    "C01": {"status": "pass", "evidence": ["sg01-final-001/receipt.json", "language-final-001/receipt.json"], "cases": ["valid-binding", "duplicate-forward-shadow-reserved-and-retired-assignment"]},
+    "C02": {"status": "pass", "evidence": ["sg01-final-001/receipt.json", "proofs-final-001/proof-receipt.json", "language-final-001/receipt.json"], "cases": ["quoted-bytes-and-delimiters", "raw-CR-refusal"]},
+    "C03": {"status": "blocked", "blockers": ["cross-file/session authority requires the real owner service"]},
+    "C04": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "language-final-001/receipt.json", "differential-final-001/differential-receipt.json"], "cases": ["marker-boundaries-and-utf8-offsets"]},
+    "C05": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "language-final-001/receipt.json", "differential-final-001/differential-receipt.json"], "cases": ["group-cardinality-absence-and-zero-width"]},
+    "C06": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "language-final-001/receipt.json", "differential-final-001/differential-receipt.json"], "cases": ["mixed-EOL-multiline-wrap", "NUL-and-invalid-UTF8-refusal"]},
+    "C07": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "differential-final-001/differential-receipt.json"], "cases": ["frozen-source-swaps-and-overlap-refusal"]},
+    "C08": {"status": "pass", "evidence": ["language-final-001/receipt.json", "fuzz-final-001/fuzz-receipt.json"], "cases": ["limit-boundaries-and-bounded-work"]},
+    "C09": {"status": "pass", "evidence": ["authority-final-001/receipt.json", "language-final-001/receipt.json", "fuzz-final-001/fuzz-receipt.json"], "cases": ["nominal-type-and-decoder-refusals"]},
+    "C10": {"status": "blocked", "blockers": ["Weft attachment and grant authority require owner admissions"]},
+    "C11": {"status": "blocked", "blockers": ["dirty Worktrunk snapshot and native stale-apply evidence requires the host"]},
+    "C12": {"status": "blocked", "blockers": ["durable same-key effect replay requires the real adapter"]},
+    "C13": {"status": "blocked", "blockers": ["native kill/restart reconciliation requires SG09"]},
+    "C14": {"status": "blocked", "blockers": ["contained native path and metadata effects require SG09"]},
+    "C15": {"status": "blocked", "blockers": ["ENOSPC and fsync fault injection requires the native adapter"]},
+    "C16": {"status": "blocked", "blockers": ["writer fencing and child reaping require the native owner"]},
+    "C17": {"status": "blocked", "blockers": ["multi-repository effects require the real owner"]},
+    "C18": {"status": "blocked", "blockers": ["native create/remove/rename races require SG09"]},
+    "C19": {"status": "blocked", "blockers": ["initialized owner transport and host capability negotiation require SG08"]},
+    "C20": {"status": "blocked", "blockers": ["authorized Run Watch projections require the owner service"]},
+    "C21": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "verus-final-001/verus-receipt.json", "fuzz-final-001/fuzz-receipt.json"], "cases": ["quality-and-proof-negative-controls"]},
+    "C22": {"status": "pass", "evidence": ["preflight-final-001/receipt.json", "reproduction-final-001/receipt.json", "aggregator-final-001/valid-receipt.json"], "cases": ["cold-offline-rebuild-and-admission-refusals"]},
+    "C23": {"status": "blocked", "blockers": ["held-out two-harness usability benchmark requires SG12"]},
+    "C24": {"status": "blocked", "blockers": ["stale preview, revocation and other-worktree authority require the host"]}
+  }
+}
