@@ -554,7 +554,7 @@ class Producer:
         return {
             "schema_version": SCHEMA_VERSION,
             "gate": "SG01",
-            "source_identity": source_identity(repository),
+            "source_identity": source_identity(self.repository),
             "component": "independent_grammar_lexer_qualification",
             "scope": {
                 "syntax_and_lexing": "assessed",
