@@ -63,7 +63,7 @@ pub(crate) fn resolve_selector<'a>(
             resolve_between(first, second, lowering, bindings, origin)
         }
         Selector::Range { lo, hi } => {
-            let span = SourceSpan::new(lowering.image.bytes().len(), *lo, *hi)
+            let span = SourceSpan::new(lowering.image, *lo, *hi)
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
             Ok(CaptureView::plain(checked_span(lowering, span, origin)?))
         }
@@ -78,12 +78,8 @@ fn selection_window(
 ) -> Result<SourceSpan, CompileDiagnostic> {
     match within {
         Some(reference) => Ok(resolve_reference(reference, lowering, bindings, origin)?.span),
-        None => SourceSpan::new(
-            lowering.image.bytes().len(),
-            0,
-            lowering.image.bytes().len(),
-        )
-        .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin)),
+        None => SourceSpan::new(lowering.image, 0, lowering.image.bytes().len())
+            .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin)),
     }
 }
 
@@ -137,7 +133,7 @@ fn resolve_one<'a>(
             origin,
         )),
         (1, Some(start)) => {
-            let span = SourceSpan::new(bytes.len(), start, start + needle.len())
+            let span = SourceSpan::new(lowering.image, start, start + needle.len())
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
             Ok(CaptureView::plain(checked_span(lowering, span, origin)?))
         }
@@ -193,7 +189,7 @@ fn resolve_one_line<'a>(
             } else {
                 LineEnding::Lf
             };
-            let span = SourceSpan::new(bytes.len(), start, body_end)
+            let span = SourceSpan::new(lowering.image, start, body_end)
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
             found = Some(CaptureView {
                 span,
@@ -256,7 +252,7 @@ fn resolve_between<'a>(
             origin,
         ));
     }
-    let span = SourceSpan::new(lowering.image.bytes().len(), full_end, second.span.lo())
+    let span = SourceSpan::new(lowering.image, full_end, second.span.lo())
         .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
     Ok(CaptureView::plain(checked_span(lowering, span, origin)?))
 }

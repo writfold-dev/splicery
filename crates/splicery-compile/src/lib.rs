@@ -104,7 +104,13 @@ fn lower_edit(
                 CAPTURE_ORIGIN,
             ));
         }
-        let span = SourceSpan::new(image.bytes().len(), capture.span.lo(), capture.span.hi())
+        if capture.span.capture_sha256() != image.capture_sha256() {
+            return Err(CompileDiagnostic::new(
+                CompileError::OutOfBounds,
+                CAPTURE_ORIGIN,
+            ));
+        }
+        let span = SourceSpan::new(image, capture.span.lo(), capture.span.hi())
             .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, CAPTURE_ORIGIN))?;
         let resolved = ResolvedCapture::plain(span);
         validate_capture(&resolved, &mut lowering, CAPTURE_ORIGIN)?;

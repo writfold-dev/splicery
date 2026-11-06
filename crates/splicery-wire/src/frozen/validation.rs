@@ -11,7 +11,7 @@ pub(super) fn source_span(
     lo: usize,
     hi: usize,
 ) -> Result<SourceSpan, String> {
-    let span = SourceSpan::new(image.bytes().len(), lo, hi)
+    let span = SourceSpan::new(image, lo, hi)
         .ok_or_else(|| "source span is reversed or outside the image".to_string())?;
     if image.profile() == Profile::Text {
         let boundary = |at| {
@@ -39,7 +39,15 @@ pub(super) fn validate_frozen(
     if frozen.members.len() > MAX_MATCHES {
         return Err("frozen member count exceeds 4096".to_string());
     }
+    if let Some(image) = image
+        && frozen.capture_sha256 != image.capture_sha256()
+    {
+        return Err("frozen capture digest does not match the original image".to_string());
+    }
     if let Some(scope) = frozen.scope {
+        if scope.capture_sha256() != frozen.capture_sha256 {
+            return Err("frozen scope identity does not match the capture digest".to_string());
+        }
         if scope.lo() > scope.hi() {
             return Err("reversed frozen scope".to_string());
         }
@@ -49,6 +57,9 @@ pub(super) fn validate_frozen(
     }
     let mut previous_hi = None;
     for member in &frozen.members {
+        if member.span.capture_sha256() != frozen.capture_sha256 {
+            return Err("frozen member identity does not match the capture digest".to_string());
+        }
         validate_member(member, frozen.scope, previous_hi, image)?;
         previous_hi = Some(member.span.hi());
     }
@@ -93,6 +104,9 @@ fn validate_group_span(
     let Some(group) = group else {
         return Ok(());
     };
+    if group.capture_sha256() != member.capture_sha256() {
+        return Err("capture group identity does not match its member".to_string());
+    }
     if group.lo() > group.hi() || group.lo() < member.lo() || group.hi() > member.hi() {
         return Err("capture group lies outside its overall member".to_string());
     }

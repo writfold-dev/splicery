@@ -63,13 +63,16 @@ fn transform_pattern(pattern: &str) -> Result<String, RegexError> {
         match bytes[at] {
             b'\\' => {
                 let next = *bytes.get(at + 1).ok_or(RegexError::InvalidPattern)?;
-                if next.is_ascii_digit() || matches!(next, b'k' | b'g') {
+                if next.is_ascii_digit() || matches!(next, b'b' | b'B' | b'k' | b'g') {
                     return Err(RegexError::UnsupportedConstruct);
                 }
                 let replacement = match (class_depth > 0, next) {
                     (false, b'w') => Some("[[:word:]]"),
                     (false, b'd') => Some("[[:digit:]]"),
                     (false, b's') => Some("[[:space:]]"),
+                    (_, b'W') => Some("[^[:word:]]"),
+                    (_, b'D') => Some("[^[:digit:]]"),
+                    (_, b'S') => Some("[^[:space:]]"),
                     (true, b'w') => Some("[:word:]"),
                     (true, b'd') => Some("[:digit:]"),
                     (true, b's') => Some("[:space:]"),
@@ -241,7 +244,11 @@ pub fn match_lines(
     let scope_span = scope.map(|capture| capture.span);
     let lo = scope_span.map_or(0, |span| span.lo());
     let hi = scope_span.map_or(bytes.len(), |span| span.hi());
-    if hi > bytes.len() || !text.is_char_boundary(lo) || !text.is_char_boundary(hi) {
+    if scope_span.is_some_and(|span| span.capture_sha256() != image.capture_sha256())
+        || hi > bytes.len()
+        || !text.is_char_boundary(lo)
+        || !text.is_char_boundary(hi)
+    {
         return Err(RegexError::InvalidScope);
     }
     let mut members = Vec::with_capacity(expected);
@@ -249,15 +256,16 @@ pub fn match_lines(
     while cursor < bytes.len() {
         let (body_hi, next, ending) = logical_line(bytes, cursor, bytes.len());
         let body = text.get(cursor..body_hi).ok_or(RegexError::InvalidUtf8)?;
-        let visited = (next - cursor)
-            .checked_add(body.len())
+        let work = pattern
+            .len()
+            .checked_mul(body.len())
             .ok_or(RegexError::BudgetExceeded)?;
-        charge(budget, visited)?;
+        charge(budget, work)?;
         for captures in regex.captures_iter(body) {
             let whole = captures.get(0).ok_or(RegexError::IncompleteMatch)?;
             charge(budget, whole.len())?;
             charge_named_captures(&regex, &captures, budget)?;
-            let span = capture_span(bytes.len(), cursor, body.len(), 0, bytes.len(), &whole)?;
+            let span = capture_span(image, cursor, body.len(), 0, bytes.len(), &whole)?;
             if span.lo() < lo || span.hi() > hi {
                 continue;
             }
@@ -278,14 +286,7 @@ pub fn match_lines(
                         if found.start() < whole.start() || found.end() > whole.end() {
                             return Err(RegexError::IncompleteMatch);
                         }
-                        Some(capture_span(
-                            bytes.len(),
-                            cursor,
-                            body.len(),
-                            lo,
-                            hi,
-                            &found,
-                        )?)
+                        Some(capture_span(image, cursor, body.len(), lo, hi, &found)?)
                     }
                     None => None,
                 };
@@ -330,7 +331,7 @@ fn charge_named_captures(
 }
 
 fn capture_span(
-    image_len: usize,
+    image: &OriginalImage,
     body_lo: usize,
     body_len: usize,
     scope_lo: usize,
@@ -349,7 +350,7 @@ fn capture_span(
     if lo < scope_lo || hi > scope_hi {
         return Err(RegexError::OutOfScopeMatch);
     }
-    SourceSpan::new(image_len, lo, hi).ok_or(RegexError::OutOfScopeMatch)
+    SourceSpan::new(image, lo, hi).ok_or(RegexError::OutOfScopeMatch)
 }
 
 #[cfg(test)]

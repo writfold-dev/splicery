@@ -26,27 +26,37 @@ pub struct RecipeSpan {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceSpan {
+    capture_sha256: [u8; 32],
     lo: usize,
     hi: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReadCapture {
+    capture_sha256: [u8; 32],
     lo: usize,
     hi: usize,
 }
 
 impl ReadCapture {
-    pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
-        if lo <= hi && hi <= image_len {
-            Some(Self { lo, hi })
+    pub fn new(image: &OriginalImage, lo: usize, hi: usize) -> Option<Self> {
+        if lo <= hi && hi <= image.bytes.len() {
+            Some(Self {
+                capture_sha256: image.capture_sha256,
+                lo,
+                hi,
+            })
         } else {
             None
         }
     }
 
-    pub fn insertion(image_len: usize, at: usize) -> Option<Self> {
-        Self::new(image_len, at, at)
+    pub fn insertion(image: &OriginalImage, at: usize) -> Option<Self> {
+        Self::new(image, at, at)
+    }
+
+    pub fn capture_sha256(self) -> [u8; 32] {
+        self.capture_sha256
     }
 
     pub fn lo(self) -> usize {
@@ -62,21 +72,30 @@ impl ReadCapture {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EditTarget {
+    capture_sha256: [u8; 32],
     lo: usize,
     hi: usize,
 }
 
 impl EditTarget {
-    pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
-        if lo <= hi && hi <= image_len {
-            Some(Self { lo, hi })
+    pub fn new(image: &OriginalImage, lo: usize, hi: usize) -> Option<Self> {
+        if lo <= hi && hi <= image.bytes.len() {
+            Some(Self {
+                capture_sha256: image.capture_sha256,
+                lo,
+                hi,
+            })
         } else {
             None
         }
     }
 
-    pub fn insertion(image_len: usize, at: usize) -> Option<Self> {
-        Self::new(image_len, at, at)
+    pub fn insertion(image: &OriginalImage, at: usize) -> Option<Self> {
+        Self::new(image, at, at)
+    }
+
+    pub fn capture_sha256(self) -> [u8; 32] {
+        self.capture_sha256
     }
 
     pub fn lo(self) -> usize {
@@ -91,16 +110,24 @@ impl EditTarget {
 }
 
 impl SourceSpan {
-    pub fn new(image_len: usize, lo: usize, hi: usize) -> Option<Self> {
-        if lo <= hi && hi <= image_len {
-            Some(Self { lo, hi })
+    pub fn new(image: &OriginalImage, lo: usize, hi: usize) -> Option<Self> {
+        if lo <= hi && hi <= image.bytes.len() {
+            Some(Self {
+                capture_sha256: image.capture_sha256,
+                lo,
+                hi,
+            })
         } else {
             None
         }
     }
 
-    pub fn insertion(image_len: usize, at: usize) -> Option<Self> {
-        Self::new(image_len, at, at)
+    pub fn insertion(image: &OriginalImage, at: usize) -> Option<Self> {
+        Self::new(image, at, at)
+    }
+
+    pub fn capture_sha256(self) -> [u8; 32] {
+        self.capture_sha256
     }
 
     pub fn lo(self) -> usize {
@@ -118,6 +145,7 @@ impl SourceSpan {
 pub struct OriginalImage {
     bytes: Vec<u8>,
     profile: Profile,
+    capture_sha256: [u8; 32],
 }
 
 impl OriginalImage {
@@ -128,7 +156,14 @@ impl OriginalImage {
         if profile == Profile::Text && std::str::from_utf8(&bytes).is_err() {
             return None;
         }
-        Some(Self { bytes, profile })
+        let digest = Sha256::digest(&bytes);
+        let mut capture_sha256 = [0u8; 32];
+        capture_sha256.copy_from_slice(&digest);
+        Some(Self {
+            bytes,
+            profile,
+            capture_sha256,
+        })
     }
 
     pub fn bytes(&self) -> &[u8] {
@@ -138,10 +173,7 @@ impl OriginalImage {
         self.profile
     }
     pub fn capture_sha256(&self) -> [u8; 32] {
-        let digest = Sha256::digest(&self.bytes);
-        let mut output = [0u8; 32];
-        output.copy_from_slice(&digest);
-        output
+        self.capture_sha256
     }
 }
 

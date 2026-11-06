@@ -28,13 +28,12 @@ pub(crate) fn lower_change(
         retained_literals,
     )?;
     validate_text_payload(&replacement, lowering, change.origin)?;
-    let image_len = lowering.image.bytes().len();
     let target = match change.kind {
         ChangeKind::Replace | ChangeKind::Delete => {
-            EditTarget::new(image_len, selected.span.lo(), selected.span.hi())
+            EditTarget::new(lowering.image, selected.span.lo(), selected.span.hi())
         }
-        ChangeKind::Before => EditTarget::insertion(image_len, selected.span.lo()),
-        ChangeKind::After => EditTarget::insertion(image_len, selected.span.hi()),
+        ChangeKind::Before => EditTarget::insertion(lowering.image, selected.span.lo()),
+        ChangeKind::After => EditTarget::insertion(lowering.image, selected.span.hi()),
     }
     .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, change.origin))?;
     lowering.push_splice(Splice {

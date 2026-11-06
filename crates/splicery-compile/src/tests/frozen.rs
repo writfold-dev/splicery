@@ -3,18 +3,18 @@ use super::*;
 
 fn frozen_set(image: &OriginalImage) -> Result<FrozenSet, ()> {
     let member = ResolvedCapture {
-        span: SourceSpan::new(1, 0, 1).ok_or(())?,
+        span: SourceSpan::new(image, 0, 1).ok_or(())?,
         line: None,
         groups: vec![CaptureGroup {
             name: "empty".into(),
-            span: Some(SourceSpan::new(1, 0, 0).ok_or(())?),
+            span: Some(SourceSpan::new(image, 0, 0).ok_or(())?),
         }],
     };
     Ok(FrozenSet {
         name: "rows".into(),
         matcher_profile: regex::PROFILE_ID.into(),
         capture_sha256: image.capture_sha256(),
-        scope: Some(SourceSpan::new(1, 0, 1).ok_or(())?),
+        scope: Some(SourceSpan::new(image, 0, 1).ok_or(())?),
         members: vec![member],
     })
 }
@@ -46,10 +46,10 @@ fn frozen_iteration_checks_identity_scope_members_and_binder_scope() -> Result<(
     wrong_profile.matcher_profile = "other".into();
     assert!(lower(&frozen_iteration(), &image, &[], &[wrong_profile]).is_err());
     let mut wrong_scope = set.clone();
-    wrong_scope.scope = Some(SourceSpan::insertion(1, 0).ok_or(())?);
+    wrong_scope.scope = Some(SourceSpan::insertion(&image, 0).ok_or(())?);
     assert!(lower(&frozen_iteration(), &image, &[], &[wrong_scope]).is_err());
     let mut wrong_member = set.clone();
-    wrong_member.members[0].span = SourceSpan::insertion(1, 0).ok_or(())?;
+    wrong_member.members[0].span = SourceSpan::insertion(&image, 0).ok_or(())?;
     assert!(lower(&frozen_iteration(), &image, &[], &[wrong_member]).is_err());
 
     let missing = lower(&frozen_iteration(), &image, &[], &[]);

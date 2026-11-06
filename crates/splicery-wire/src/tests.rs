@@ -11,7 +11,7 @@ fn make_image(bytes: &[u8]) -> Result<OriginalImage, String> {
 }
 
 fn span(image: &OriginalImage, lo: usize, hi: usize) -> Result<SourceSpan, String> {
-    SourceSpan::new(image.bytes().len(), lo, hi).ok_or_else(|| "invalid test span".to_string())
+    SourceSpan::new(image, lo, hi).ok_or_else(|| "invalid test span".to_string())
 }
 
 fn groups(image: &OriginalImage, lo: usize, hi: usize) -> Result<Vec<CaptureGroup>, String> {
@@ -132,6 +132,10 @@ fn frozen_rejects_wrong_digest_profile_and_noncanonical_digest() -> Result<(), S
     assert!(parse_frozen(wrong_profile.as_bytes(), &image).is_err());
     assert!(parse_frozen(wrong_digest.as_bytes(), &image).is_err());
     assert!(parse_frozen(uppercase.as_bytes(), &image).is_err());
+
+    let mut foreign = simple_frozen(&image)?;
+    foreign.members[0].span = span(&wrong_image, 0, 1)?;
+    assert!(encode_frozen(&foreign).is_err());
     Ok(())
 }
 

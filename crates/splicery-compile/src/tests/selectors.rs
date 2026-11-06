@@ -26,7 +26,7 @@ fn one_counts_overlaps_and_honors_within() -> Result<(), ()> {
 
     let capture = CaptureBinding {
         name: "tail".to_owned(),
-        span: ReadCapture::new(3, 1, 3).ok_or(())?,
+        span: ReadCapture::new(&image, 1, 3).ok_or(())?,
     };
     let lowered = lower_splices(
         &raw_recipe(vec![change(
@@ -70,7 +70,7 @@ fn bindings_are_source_ordered_and_cannot_shadow() -> Result<(), ()> {
 
     let capture = CaptureBinding {
         name: "same".to_owned(),
-        span: ReadCapture::new(3, 0, 1).ok_or(())?,
+        span: ReadCapture::new(&image, 0, 1).ok_or(())?,
     };
     let duplicate = lower_splices(
         &raw_recipe(vec![binding("same", range(1, 2))]),
@@ -111,7 +111,7 @@ fn lowers_insertions_and_original_copies() -> Result<(), ()> {
     assert_eq!((lowered[1].target.lo(), lowered[1].target.hi()), (0, 0));
     assert_eq!(
         lowered[0].replacement[1],
-        Part::Copy(SourceSpan::new(6, 0, 2).ok_or(())?)
+        Part::Copy(SourceSpan::new(&image, 0, 2).ok_or(())?)
     );
     Ok(())
 }

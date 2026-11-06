@@ -215,7 +215,7 @@ fn contained_file(root: &Path, relative: &str) -> Result<PathBuf, String> {
     Ok(candidate)
 }
 
-fn capture(text: &str, image_len: usize) -> Result<CaptureBinding, String> {
+fn capture(text: &str, image: &OriginalImage) -> Result<CaptureBinding, String> {
     let (name, range) = text
         .split_once('=')
         .ok_or_else(|| "capture must be @name=LO:HI".to_string())?;
@@ -227,7 +227,7 @@ fn capture(text: &str, image_len: usize) -> Result<CaptureBinding, String> {
     }
     let lo = parse_nat(lo).ok_or_else(|| "invalid capture start".to_string())?;
     let hi = parse_nat(hi).ok_or_else(|| "invalid capture end".to_string())?;
-    let span = ReadCapture::new(image_len, lo, hi)
+    let span = ReadCapture::new(image, lo, hi)
         .ok_or_else(|| "capture is outside the image".to_string())?;
     Ok(CaptureBinding {
         name: name[1..].to_string(),
@@ -266,7 +266,7 @@ fn preview(args: PreviewArgs) -> Result<Vec<u8>, String> {
             let captures = args
                 .captures
                 .iter()
-                .map(|value| capture(value, image.bytes().len()))
+                .map(|value| capture(value, &image))
                 .collect::<Result<Vec<_>, _>>()?;
             let frozen = args
                 .frozen
@@ -330,7 +330,7 @@ fn inspect(args: InspectArgs) -> Result<Vec<u8>, String> {
                 .ok_or_else(|| "scope must be LO:HI".to_string())?;
             let lo = parse_nat(lo).ok_or_else(|| "invalid scope start".to_string())?;
             let hi = parse_nat(hi).ok_or_else(|| "invalid scope end".to_string())?;
-            let span = SourceSpan::new(image.bytes().len(), lo, hi)
+            let span = SourceSpan::new(&image, lo, hi)
                 .ok_or_else(|| "scope is outside the image".to_string())?;
             Some(ResolvedCapture::plain(span))
         }

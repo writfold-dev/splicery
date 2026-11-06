@@ -75,10 +75,24 @@ fn rejects_empty_needles_bad_ranges_excess_matches_and_delete_payload() -> Resul
 
 #[test]
 fn rejects_foreign_capture_spans() -> Result<(), ()> {
-    let image = image(b"abc")?;
+    let image = image_with(b"abc", Profile::Raw)?;
+    let longer_image = image_with(b"abcd", Profile::Raw)?;
     let capture = CaptureBinding {
         name: "foreign".to_owned(),
-        span: ReadCapture::new(4, 0, 4).ok_or(())?,
+        span: ReadCapture::new(&longer_image, 0, 4).ok_or(())?,
+    };
+    assert_eq!(
+        lower(&raw_recipe(Vec::new()), &image, &[capture], &[]),
+        Err(CompileDiagnostic {
+            kind: CompileError::OutOfBounds,
+            origin: CAPTURE_ORIGIN,
+        })
+    );
+
+    let same_length_image = image_with(b"xyz", Profile::Raw)?;
+    let capture = CaptureBinding {
+        name: "foreign".to_owned(),
+        span: ReadCapture::new(&same_length_image, 0, 3).ok_or(())?,
     };
     assert_eq!(
         lower(&raw_recipe(Vec::new()), &image, &[capture], &[]),

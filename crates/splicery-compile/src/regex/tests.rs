@@ -1,6 +1,6 @@
 use super::*;
 
-fn image(bytes: &[u8]) -> Result<OriginalImage, RegexError> {
+fn make_image(bytes: &[u8]) -> Result<OriginalImage, RegexError> {
     OriginalImage::new(bytes.to_vec(), Profile::Text).ok_or(RegexError::InvalidUtf8)
 }
 
@@ -18,7 +18,7 @@ fn matched(image: &OriginalImage, pattern: &str, expected: usize) -> Result<Froz
 
 #[test]
 fn posix_classes_are_ascii_inside_and_outside_classes() -> Result<(), RegexError> {
-    let image = image(b"\xc3\xa9_9\t\n")?;
+    let image = make_image(b"\xc3\xa9_9\t\n")?;
     let set = matched(&image, r"\w|\d|\s", 3)?;
     let spans: Vec<_> = set
         .members
@@ -37,15 +37,48 @@ fn posix_classes_are_ascii_inside_and_outside_classes() -> Result<(), RegexError
 }
 
 #[test]
+fn uppercase_classes_complement_ascii_posix_classes() -> Result<(), RegexError> {
+    let non_word = matched(&make_image("é".as_bytes())?, r"\W+", 1)?;
+    assert_eq!(
+        (non_word.members[0].span.lo(), non_word.members[0].span.hi()),
+        (0, 2)
+    );
+    let non_digit = matched(&make_image(b"A")?, r"[\D]+", 1)?;
+    assert_eq!(
+        (
+            non_digit.members[0].span.lo(),
+            non_digit.members[0].span.hi()
+        ),
+        (0, 1)
+    );
+    let non_space = matched(&make_image(b"A")?, r"[\S]+", 1)?;
+    assert_eq!(
+        (
+            non_space.members[0].span.lo(),
+            non_space.members[0].span.hi()
+        ),
+        (0, 1)
+    );
+    assert!(compile_pattern(r"[\W]")?.is_match("é"));
+    assert!(!compile_pattern(r"[\W]")?.is_match("_"));
+    assert!(!compile_pattern(r"[\W]")?.is_match("9"));
+    assert!(compile_pattern(r"\D")?.is_match("é"));
+    assert!(!compile_pattern(r"\D")?.is_match("9"));
+    assert!(compile_pattern(r"\S")?.is_match("é"));
+    assert!(!compile_pattern(r"\S")?.is_match("\t"));
+    Ok(())
+}
+
+#[test]
 fn dot_consumes_one_unicode_scalar() -> Result<(), RegexError> {
-    let set = matched(&image("é\n".as_bytes())?, ".", 1)?;
+    let set = matched(&make_image("é\n".as_bytes())?, ".", 1)?;
     assert_eq!((set.members[0].span.lo(), set.members[0].span.hi()), (0, 2));
     Ok(())
 }
 
 #[test]
 fn groups_distinguish_absent_from_present_empty() -> Result<(), RegexError> {
-    let set = matched(&image(b"x\n")?, r"(?<absent>a)?(?<empty>)x", 1)?;
+    let set = matched(&make_image(b"x\n")?, r"(?<absent>a)?(?<empty>)x", 1)?;
     assert_eq!(set.members[0].groups[0].span, None);
     let empty = set.members[0].groups[1].span;
     assert_eq!(empty.map(|span| (span.lo(), span.hi())), Some((0, 0)));
@@ -54,7 +87,7 @@ fn groups_distinguish_absent_from_present_empty() -> Result<(), RegexError> {
 
 #[test]
 fn inventory_is_nonoverlapping_per_line_and_scoped() -> Result<(), RegexError> {
-    let image = image(b"aaa\naa\n")?;
+    let image = make_image(b"aaa\naa\n")?;
     let set = matched(&image, "aa", 2)?;
     let spans: Vec<_> = set
         .members
@@ -62,7 +95,7 @@ fn inventory_is_nonoverlapping_per_line_and_scoped() -> Result<(), RegexError> {
         .map(|member| (member.span.lo(), member.span.hi()))
         .collect();
     assert_eq!(spans, [(0, 2), (4, 6)]);
-    let span = SourceSpan::new(image.bytes().len(), 4, 6).ok_or(RegexError::InvalidScope)?;
+    let span = SourceSpan::new(&image, 4, 6).ok_or(RegexError::InvalidScope)?;
     let scope = ResolvedCapture::plain(span);
     let scoped = match_lines(
         &image,
@@ -78,13 +111,26 @@ fn inventory_is_nonoverlapping_per_line_and_scoped() -> Result<(), RegexError> {
     assert_eq!(scoped.capture_sha256, [9; 32]);
     assert_eq!(scoped.scope, Some(span));
     assert_eq!(scoped.members[0].line, Some(LineEnding::Lf));
+
+    let foreign = make_image(b"bbb\nbb\n")?;
+    let foreign_span = SourceSpan::new(&foreign, 4, 6).ok_or(RegexError::InvalidScope)?;
+    let rejected = match_lines(
+        &image,
+        "chosen",
+        "aa",
+        Some(ResolvedCapture::plain(foreign_span)),
+        1,
+        [9; 32],
+        &mut Budget::new(),
+    );
+    assert_eq!(rejected.map(|_| ()), Err(RegexError::InvalidScope));
     Ok(())
 }
 
 #[test]
 fn scope_preserves_physical_anchors_and_actual_eof() -> Result<(), RegexError> {
-    let image = image(b"ab cd\nlast")?;
-    let middle = SourceSpan::new(image.bytes().len(), 2, 5).ok_or(RegexError::InvalidScope)?;
+    let image = make_image(b"ab cd\nlast")?;
+    let middle = SourceSpan::new(&image, 2, 5).ok_or(RegexError::InvalidScope)?;
     let set = match_lines(
         &image,
         "middle",
@@ -106,7 +152,7 @@ fn scope_preserves_physical_anchors_and_actual_eof() -> Result<(), RegexError> {
         &mut Budget::new(),
     )?;
     assert!(anchored.members.is_empty());
-    let end = SourceSpan::new(image.bytes().len(), 6, 10).ok_or(RegexError::InvalidScope)?;
+    let end = SourceSpan::new(&image, 6, 10).ok_or(RegexError::InvalidScope)?;
     let last = match_lines(
         &image,
         "last",
@@ -123,15 +169,45 @@ fn scope_preserves_physical_anchors_and_actual_eof() -> Result<(), RegexError> {
 #[test]
 fn rejects_zero_width_and_unsupported_constructs() -> Result<(), RegexError> {
     assert_eq!(
-        matched(&image(b"bbb\n")?, "a*", 0),
+        matched(&make_image(b"bbb\n")?, "a*", 0),
         Err(RegexError::ZeroWidthMatch)
     );
-    for pattern in [r"(?i)a", r"(?=a)", r"(a)\1", r"(?P<x>a)"] {
+    for pattern in [
+        r"(?i)a",
+        r"(?=a)",
+        r"(a)\1",
+        r"(?P<x>a)",
+        r"\b",
+        r"\B",
+        r"[\b]",
+        r"[\B]",
+    ] {
         assert!(matches!(
             compile_pattern(pattern),
             Err(RegexError::UnsupportedConstruct)
         ));
     }
+    Ok(())
+}
+
+#[test]
+fn charges_pattern_length_times_body_length_plus_group_bytes() -> Result<(), RegexError> {
+    let image = make_image(b"xx\nxx\n")?;
+    let pattern = r"(?<pair>xx)";
+    let mut budget = Budget::new();
+    let before = budget.remaining();
+    let set = match_lines(&image, "rows", pattern, None, 2, [0; 32], &mut budget)?;
+    assert_eq!(set.members.len(), 2);
+    let expected = 2 * pattern.len() + 2 * (pattern.len() * 2 + 2 + 2);
+    assert_eq!(before - budget.remaining(), expected);
+
+    let mut insufficient = Budget::new();
+    let remaining = insufficient.remaining();
+    charge(&mut insufficient, remaining - (expected - 1))?;
+    assert_eq!(
+        match_lines(&image, "rows", pattern, None, 2, [0; 32], &mut insufficient,),
+        Err(RegexError::BudgetExceeded)
+    );
     Ok(())
 }
 
@@ -143,14 +219,14 @@ fn enforces_source_match_and_budget_bounds() -> Result<(), RegexError> {
     ));
     let many = "x\n".repeat(MAX_MATCHES + 1);
     assert_eq!(
-        matched(&image(many.as_bytes())?, "x", 0),
+        matched(&make_image(many.as_bytes())?, "x", 0),
         Err(RegexError::TooManyMatches)
     );
     let mut budget = Budget::new();
     let remaining = budget.remaining();
     charge(&mut budget, remaining - 1)?;
     assert_eq!(
-        matched_with_budget(&image(b"x\n")?, &mut budget),
+        matched_with_budget(&make_image(b"x\n")?, &mut budget),
         Err(RegexError::BudgetExceeded)
     );
     Ok(())

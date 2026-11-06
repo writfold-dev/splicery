@@ -72,6 +72,9 @@ impl PreparedBatch {
 }
 
 fn validate_span(image: &OriginalImage, span: SourceSpan) -> Result<(), KernelError> {
+    if span.capture_sha256() != image.capture_sha256() {
+        return Err(KernelError::OutOfBounds);
+    }
     let bytes = image.bytes();
     if span.lo() > span.hi() || span.hi() > bytes.len() {
         return Err(KernelError::OutOfBounds);
@@ -86,6 +89,9 @@ fn validate_span(image: &OriginalImage, span: SourceSpan) -> Result<(), KernelEr
 }
 
 fn validate_target(image: &OriginalImage, target: EditTarget) -> Result<(), KernelError> {
+    if target.capture_sha256() != image.capture_sha256() {
+        return Err(KernelError::OutOfBounds);
+    }
     let bytes = image.bytes();
     if target.lo() > target.hi() || target.hi() > bytes.len() {
         return Err(KernelError::OutOfBounds);
@@ -211,8 +217,13 @@ mod tests {
         OriginalImage::new(bytes.to_vec(), profile).ok_or(KernelError::OutOfBounds)
     }
 
-    fn splice(lo: usize, hi: usize, replacement: Vec<Part>) -> Result<Splice, KernelError> {
-        let target = EditTarget::new(usize::MAX, lo, hi).ok_or(KernelError::OutOfBounds)?;
+    fn splice(
+        image: &OriginalImage,
+        lo: usize,
+        hi: usize,
+        replacement: Vec<Part>,
+    ) -> Result<Splice, KernelError> {
+        let target = EditTarget::new(image, lo, hi).ok_or(KernelError::OutOfBounds)?;
         let origin = RecipeSpan { start: 0, end: 1 };
         Ok(Splice {
             target,
@@ -224,8 +235,13 @@ mod tests {
     #[test]
     fn renders_original_gaps_and_copies() -> Result<(), KernelError> {
         let original = image(b"abcdef", Profile::Raw)?;
-        let copy = SourceSpan::new(6, 4, 6).ok_or(KernelError::OutOfBounds)?;
-        let change = splice(1, 3, vec![Part::Literal(b"XY".to_vec()), Part::Copy(copy)])?;
+        let copy = SourceSpan::new(&original, 4, 6).ok_or(KernelError::OutOfBounds)?;
+        let change = splice(
+            &original,
+            1,
+            3,
+            vec![Part::Literal(b"XY".to_vec()), Part::Copy(copy)],
+        )?;
         let candidate = render(&PreparedBatch::new(original, vec![change])?)?;
         assert_eq!(candidate.bytes(), b"aXYefdef");
         assert_eq!(candidate.edits()[0].replacement, b"XYef");
@@ -236,10 +252,10 @@ mod tests {
     fn rejects_insertion_at_replacement_boundaries() -> Result<(), KernelError> {
         let original = image(b"abcdef", Profile::Raw)?;
         let result = PreparedBatch::new(
-            original,
+            original.clone(),
             vec![
-                splice(1, 3, vec![])?,
-                splice(3, 3, vec![Part::Literal(b"x".to_vec())])?,
+                splice(&original, 1, 3, vec![])?,
+                splice(&original, 3, 3, vec![Part::Literal(b"x".to_vec())])?,
             ],
         )
         .map(|_| ());
@@ -251,10 +267,10 @@ mod tests {
     fn permits_adjacent_nonempty_replacements() -> Result<(), KernelError> {
         let original = image(b"abcdef", Profile::Raw)?;
         let batch = PreparedBatch::new(
-            original,
+            original.clone(),
             vec![
-                splice(3, 4, vec![Part::Literal(b"X".to_vec())])?,
-                splice(1, 3, vec![Part::Literal(b"Y".to_vec())])?,
+                splice(&original, 3, 4, vec![Part::Literal(b"X".to_vec())])?,
+                splice(&original, 1, 3, vec![Part::Literal(b"Y".to_vec())])?,
             ],
         )?;
         assert_eq!(render(&batch)?.bytes(), b"aYXef");
@@ -264,7 +280,7 @@ mod tests {
     #[test]
     fn rejects_invalid_text_candidate_without_result() -> Result<(), KernelError> {
         let original = image("aé".as_bytes(), Profile::Text)?;
-        let change = splice(0, 1, vec![Part::Literal(vec![0xff])])?;
+        let change = splice(&original, 0, 1, vec![Part::Literal(vec![0xff])])?;
         let batch = PreparedBatch::new(original, vec![change])?;
         assert_eq!(render(&batch), Err(KernelError::InvalidUtf8Boundary));
         Ok(())
@@ -273,11 +289,42 @@ mod tests {
     #[test]
     fn identical_candidate_is_no_change() -> Result<(), KernelError> {
         let original = image(b"abc", Profile::Raw)?;
-        let copy = SourceSpan::new(3, 1, 2).ok_or(KernelError::OutOfBounds)?;
-        let change = splice(1, 2, vec![Part::Copy(copy)])?;
+        let copy = SourceSpan::new(&original, 1, 2).ok_or(KernelError::OutOfBounds)?;
+        let change = splice(&original, 1, 2, vec![Part::Copy(copy)])?;
         let candidate = render(&PreparedBatch::new(original, vec![change])?)?;
         assert!(candidate.no_change());
         assert_eq!(candidate.bytes(), b"abc");
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_foreign_targets_and_copies_despite_matching_lengths() -> Result<(), KernelError> {
+        let original = image(b"abcdef", Profile::Raw)?;
+        let foreign = image(b"uvwxyz", Profile::Raw)?;
+        assert_eq!(original.bytes().len(), foreign.bytes().len());
+        assert_ne!(original.capture_sha256(), foreign.capture_sha256());
+
+        let valid_copy = SourceSpan::new(&original, 4, 6).ok_or(KernelError::OutOfBounds)?;
+        let valid = splice(&original, 1, 3, vec![Part::Copy(valid_copy)])?;
+        assert!(PreparedBatch::new(original.clone(), vec![valid]).is_ok());
+
+        let foreign_target = EditTarget::new(&foreign, 1, 3).ok_or(KernelError::OutOfBounds)?;
+        let change = Splice {
+            target: foreign_target,
+            replacement: vec![Part::Copy(valid_copy)],
+            origin: RecipeSpan { start: 0, end: 1 },
+        };
+        assert_eq!(
+            PreparedBatch::new(original.clone(), vec![change]).map(|_| ()),
+            Err(KernelError::OutOfBounds)
+        );
+
+        let foreign_copy = SourceSpan::new(&foreign, 4, 6).ok_or(KernelError::OutOfBounds)?;
+        let change = splice(&original, 1, 3, vec![Part::Copy(foreign_copy)])?;
+        assert_eq!(
+            PreparedBatch::new(original, vec![change]).map(|_| ()),
+            Err(KernelError::OutOfBounds)
+        );
         Ok(())
     }
 

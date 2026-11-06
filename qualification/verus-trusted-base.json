@@ -64,12 +64,12 @@
     {
       "type": "splicery_domain::SourceSpan",
       "declaration": "ExSourceSpan",
-      "treatment": "external type specification plus external_body solely to hide the private representation; executable production bodies are not excluded; values are accessed only through the three inventoried methods"
+      "treatment": "external type specification plus external_body solely to hide the private representation, including the capture digest; executable production bodies are not excluded; coordinates in verified functions are accessed only through the three inventoried methods"
     },
     {
       "type": "splicery_domain::EditTarget",
       "declaration": "ExEditTarget",
-      "treatment": "external type specification plus external_body solely to hide the private representation; executable production bodies are not excluded; values are accessed only through the three inventoried methods"
+      "treatment": "external type specification plus external_body solely to hide the private representation, including the capture digest; executable production bodies are not excluded; coordinates in verified functions are accessed only through the three inventoried methods"
     },
     {
       "type": "splicery_domain::Part",
@@ -172,23 +172,27 @@
   "producer_bridges": [
     {
       "symbol": "splicery_domain::OriginalImage::new",
-      "assumption": "admits at most MAX_INPUT_BYTES and validates UTF-8 for Profile::Text; construction is outside the verified kernel module"
+      "assumption": "admits at most MAX_INPUT_BYTES, validates UTF-8 for Profile::Text, and computes the exact SHA-256 capture identity once during construction; construction is outside the verified kernel module"
     },
     {
-      "symbol": "splicery_domain::OriginalImage::bytes and OriginalImage::profile",
-      "assumption": "return the immutable captured byte vector and its original Raw/Text profile without normalization or mutation"
+      "symbol": "splicery_domain::OriginalImage::bytes, OriginalImage::profile, and OriginalImage::capture_sha256",
+      "assumption": "return the immutable captured byte vector, its original Raw/Text profile without normalization or mutation, and the capture digest cached at construction"
     },
     {
       "symbol": "splicery_domain::SourceSpan::new and SourceSpan::insertion",
-      "assumption": "construct ordered spans bounded by the supplied image length; validated again by validate_span before batch preparation"
+      "assumption": "construct ordered spans bounded by the supplied original image and stamped with its exact capture SHA-256; bounds and identity are validated again before batch preparation"
     },
     {
-      "symbol": "crates/splicery-kernel/src/lib.rs::validate_span",
-      "assumption": "checks ordered in-image targets/copies and text char boundaries; this runtime validation is not weakened or replaced by proof preconditions"
+      "symbol": "splicery_domain::ReadCapture::new, ReadCapture::insertion, EditTarget::new, and EditTarget::insertion",
+      "assumption": "construct ordered captures or targets bounded by the supplied original image and stamped with its exact capture SHA-256 without read-to-edit promotion"
+    },
+    {
+      "symbol": "crates/splicery-kernel/src/lib.rs::validate_span and validate_target",
+      "assumption": "checks exact original-image identity, ordered in-image targets/copies, and text char boundaries; this runtime validation is not weakened or replaced by proof preconditions"
     },
     {
       "symbol": "crates/splicery-kernel/src/lib.rs::PreparedBatch::new",
-      "assumption": "validates every target and copy, enforces splice/payload limits, sorts by target lo, rejects overlaps and zero-width boundary collisions, and therefore establishes normalized/valid_parts preconditions for render"
+      "assumption": "rejects foreign identities for every target and copy before rendering, validates bounds, enforces splice/payload limits, sorts by target lo, rejects overlaps and zero-width boundary collisions, and therefore establishes normalized/valid_parts preconditions for render"
     },
     {
       "symbol": "crates/splicery-kernel/src/lib.rs::render",

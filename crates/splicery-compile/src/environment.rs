@@ -116,7 +116,10 @@ pub(crate) fn checked_span(
     span: SourceSpan,
     origin: RecipeSpan,
 ) -> Result<SourceSpan, CompileDiagnostic> {
-    let checked = SourceSpan::new(lowering.image.bytes().len(), span.lo(), span.hi())
+    if span.capture_sha256() != lowering.image.capture_sha256() {
+        return Err(CompileDiagnostic::new(CompileError::OutOfBounds, origin));
+    }
+    let checked = SourceSpan::new(lowering.image, span.lo(), span.hi())
         .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
     if lowering.image.profile() == Profile::Text
         && (!utf8_boundary(lowering.image.bytes(), checked.lo())

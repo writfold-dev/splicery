@@ -143,7 +143,7 @@ fn expand_iteration(
     bindings.push(Binding {
         name: iteration.binder.clone(),
         capture: ResolvedCapture::plain(
-            SourceSpan::insertion(lowering.image.bytes().len(), 0).ok_or_else(|| {
+            SourceSpan::insertion(lowering.image, 0).ok_or_else(|| {
                 CompileDiagnostic::new(CompileError::OutOfBounds, iteration.origin)
             })?,
         ),
