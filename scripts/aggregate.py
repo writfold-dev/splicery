@@ -1,18 +1,32 @@
-"""Aggregate Splicery gate evidence without converting blocked gates into passes."""
+"""Aggregate Splicery gate evidence without converting components into release passes."""
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 OFFLINE_GATES = {f"SG{number:02}" for number in range(0, 8)}
 HOST_GATES = {f"SG{number:02}" for number in range(8, 15)}
 ALLOWED_STATUS = {"pass", "component_pass", "blocked", "not_run"}
 PLACEHOLDER = re.compile(r"(?i)(sorryAx|\badmit\b|\bunsafe\b|placeholder|skipped backend)")
+
+
+def load_identity_helper():
+    loader = importlib.machinery.SourceFileLoader(
+        "splicery_identity", str(ROOT / "scripts/evidence_identity.py"))
+    spec = importlib.util.spec_from_loader("splicery_identity", loader)
+    if spec is None:
+        raise ImportError("cannot load source identity helper")
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
 
 
 def digest(path: Path) -> str:
@@ -23,24 +37,48 @@ def fail(message: str) -> None:
     raise ValueError(message)
 
 
-def validate_receipt(root: Path, entry: dict, source_commit: str) -> dict:
-    if not isinstance(entry, dict):
-        fail("receipt entry is not an object")
-    required = {"path", "sha256", "scope", "source_commit"}
-    if not required <= entry.keys():
-        fail("receipt is missing mandatory fields")
-    if entry["source_commit"] != source_commit:
-        fail("receipt source commit differs from release closure")
+def control_ids(receipt: dict) -> set[str]:
+    result = set()
+    for key in ("mutants", "cases", "controls"):
+        values = receipt.get(key, [])
+        if isinstance(values, list):
+            for value in values:
+                if isinstance(value, dict) and isinstance(value.get("name"), str):
+                    result.add(value["name"])
+                elif isinstance(value, str):
+                    result.add(value)
+    return result
+
+
+def validate_receipt(root: Path, entry: dict, gate_id: str, source_identity: dict,
+                     required_controls: list[str]) -> None:
+    if not isinstance(entry, dict) or not {"path", "sha256", "scope", "source_commit"} <= entry.keys():
+        fail(f"invalid receipt entry for {gate_id}")
+    if entry["source_commit"] != source_identity["source_commit"]:
+        fail(f"stale receipt for {gate_id}")
     path = Path(entry["path"])
     if path.is_absolute() or ".." in path.parts:
-        fail("receipt path must be relative to the evidence root")
+        fail(f"receipt path escapes evidence root: {path}")
     evidence = root / path
     if not evidence.is_file() or digest(evidence) != entry["sha256"]:
-        fail(f"missing or mismatched receipt: {path}")
-    text = evidence.read_text(errors="replace")
-    if PLACEHOLDER.search(text):
-        fail(f"placeholder or forbidden evidence: {path}")
-    return entry
+        fail(f"missing or mismatched receipt for {gate_id}: {path}")
+    if PLACEHOLDER.search(evidence.read_text(errors="replace")):
+        fail(f"placeholder evidence for {gate_id}: {path}")
+    receipt = json.loads(evidence.read_text())
+    if not isinstance(receipt, dict) or type(receipt.get("schema_version")) is not int:
+        fail(f"receipt schema is missing for {gate_id}: {path}")
+    if receipt.get("gate") != gate_id:
+        fail(f"receipt gate mismatch for {gate_id}: {path}")
+    status = receipt.get("status")
+    if status != "pass" and not (isinstance(status, str) and status.startswith("passed_")):
+        fail(f"receipt is not passing for {gate_id}: {path}: {status}")
+    if receipt.get("error") is not None or receipt.get("errors") not in (None, []):
+        fail(f"receipt contains failures for {gate_id}: {path}")
+    if receipt.get("source_identity") != source_identity:
+        fail(f"receipt source/tool identity differs for {gate_id}: {path}")
+    missing = set(required_controls) - control_ids(receipt)
+    if missing:
+        fail(f"missing controls for {gate_id}: {sorted(missing)}")
 
 
 def main() -> int:
@@ -58,12 +96,13 @@ def main() -> int:
     record = {"schema_version": 1, "status": "failed", "offline_complete": False,
               "release_status": "not_qualified", "errors": []}
     try:
+        identity_helper = load_identity_helper()
+        source_identity = identity_helper.source_identity(ROOT)
         index = json.loads(index_path.read_text())
         if index.get("schema_version") != 1 or not isinstance(index.get("gates"), dict):
             fail("invalid evidence index")
-        source_commit = index.get("source_commit")
-        if not isinstance(source_commit, str) or len(source_commit) != 40:
-            fail("invalid release source commit")
+        if index.get("source_identity") != source_identity:
+            fail("index source/tool identity differs from actual checkout")
         expected = {f"SG{number:02}" for number in range(15)}
         if set(index["gates"]) != expected:
             fail("evidence index must contain every SG00-SG14 gate")
@@ -76,18 +115,17 @@ def main() -> int:
             if not isinstance(gate, dict) or gate.get("status") not in ALLOWED_STATUS:
                 fail(f"invalid status for {gate_id}")
             status = gate["status"]
-            if status == "blocked" and gate_id in OFFLINE_GATES:
-                offline_complete = False
-                fail(f"required offline gate is blocked: {gate_id}")
-            if status == "not_run":
-                if gate_id in OFFLINE_GATES:
-                    offline_complete = False
-                continue
             if status == "blocked":
                 blockers = gate.get("blockers")
                 if not isinstance(blockers, list) or not blockers or not all(
                         isinstance(item, str) and item for item in blockers):
                     fail(f"missing blockers for {gate_id}")
+                if gate_id in OFFLINE_GATES:
+                    offline_complete = False
+                continue
+            if status == "not_run":
+                if gate_id in OFFLINE_GATES:
+                    offline_complete = False
                 continue
             receipts = gate.get("receipts")
             if not isinstance(receipts, list) or not receipts:
@@ -95,26 +133,29 @@ def main() -> int:
             paths = [entry.get("path") for entry in receipts if isinstance(entry, dict)]
             if len(paths) != len(set(paths)):
                 fail(f"duplicate receipts for {gate_id}")
+            required_controls = gate.get("required_controls", [])
+            if not isinstance(required_controls, list) or not all(
+                    isinstance(item, str) and item for item in required_controls):
+                fail(f"invalid required controls for {gate_id}")
             for entry in receipts:
-                validate_receipt(evidence_root, entry, source_commit)
+                validate_receipt(evidence_root, entry, gate_id, source_identity, required_controls)
         for scenario_id, scenario in scenarios.items():
-            if not isinstance(scenario, dict) or not isinstance(scenario.get("status"), str):
-                fail(f"invalid scenario {scenario_id}")
-            if scenario["status"] == "pass" and not scenario.get("receipts"):
-                fail(f"scenario {scenario_id} has no receipt")
+            if not isinstance(scenario, dict) or scenario.get("status") != "pass":
+                fail(f"scenario is not passing: {scenario_id}")
+            receipts = scenario.get("receipts")
+            if not isinstance(receipts, list) or not receipts:
+                fail(f"scenario {scenario_id} has no receipts")
+            for entry in receipts:
+                validate_receipt(evidence_root, entry, scenario_id, source_identity, [])
         record["offline_complete"] = offline_complete
-        host_blocked = any(index["gates"][gate]["status"] == "blocked" for gate in HOST_GATES)
-        all_pass = all(index["gates"][gate]["status"] in {"pass", "component_pass"}
-                       for gate in expected)
+        all_pass = all(index["gates"][gate]["status"] == "pass" for gate in expected)
         if all_pass:
-            record.update({"status": "pass", "release_status": "qualified_offline_component_only"
-                           if host_blocked else "qualified"})
+            record.update({"status": "pass", "release_status": "qualified"})
         elif args.allow_blocked and offline_complete:
-            record.update({"status": "blocked_external_dependencies",
-                           "release_status": "not_qualified"})
+            record.update({"status": "blocked_external_dependencies", "release_status": "not_qualified"})
         else:
             record["errors"].append("release predecessors are incomplete")
-        record["source_commit"] = source_commit
+        record["source_identity"] = source_identity
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         record["errors"].append(f"{type(error).__name__}: {error}")
     record["rejected"] = record["status"] != "pass"
