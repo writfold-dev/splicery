@@ -97,6 +97,18 @@ def main() -> int:
         raise ValueError(f"blocked release disposition was wrong: {observed}")
     results.append({"name": "external_block", **observed})
 
+    scenario_blocked = make_index(evidence, identity_value)
+    scenario_blocked["scenarios"]["C10"] = {
+        "status": "blocked", "blockers": ["synthetic-owner-unavailable"]}
+    scenario_blocked_path = evidence / "scenario-blocked.json"
+    scenario_blocked_path.write_text(json.dumps(scenario_blocked))
+    observed = invoke(scenario_blocked_path, evidence, evidence / "scenario-blocked-receipt.json")
+    if (observed["exit_status"] == 0
+            or observed["receipt"].get("status") != "blocked_external_dependencies"
+            or observed["receipt"].get("release_status") == "qualified"):
+        raise ValueError(f"blocked scenario disposition was wrong: {observed}")
+    results.append({"name": "scenario_external_block", **observed})
+
     component = make_index(evidence, identity_value)
     component["gates"]["SG02"]["status"] = "component_pass"
     component_path = evidence / "component-not-release.json"

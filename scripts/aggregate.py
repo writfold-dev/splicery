@@ -139,8 +139,19 @@ def main() -> int:
                 fail(f"invalid required controls for {gate_id}")
             for entry in receipts:
                 validate_receipt(evidence_root, entry, gate_id, source_identity, required_controls)
+        scenario_blocked = False
         for scenario_id, scenario in scenarios.items():
-            if not isinstance(scenario, dict) or scenario.get("status") != "pass":
+            if not isinstance(scenario, dict):
+                fail(f"invalid scenario: {scenario_id}")
+            scenario_status = scenario.get("status")
+            if scenario_status == "blocked":
+                blockers = scenario.get("blockers")
+                if not isinstance(blockers, list) or not blockers or not all(
+                        isinstance(item, str) and item for item in blockers):
+                    fail(f"missing blockers for scenario {scenario_id}")
+                scenario_blocked = True
+                continue
+            if scenario_status != "pass":
                 fail(f"scenario is not passing: {scenario_id}")
             receipts = scenario.get("receipts")
             if not isinstance(receipts, list) or not receipts:
@@ -148,7 +159,8 @@ def main() -> int:
             for entry in receipts:
                 validate_receipt(evidence_root, entry, scenario_id, source_identity, [])
         record["offline_complete"] = offline_complete
-        all_pass = all(index["gates"][gate]["status"] == "pass" for gate in expected)
+        all_pass = (all(index["gates"][gate]["status"] == "pass" for gate in expected)
+                    and not scenario_blocked)
         if all_pass:
             record.update({"status": "pass", "release_status": "qualified"})
         elif args.allow_blocked and offline_complete:
