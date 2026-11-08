@@ -72,7 +72,10 @@ Other /1 productions return `Unsupported`: file lifecycle operations, `one line`
 
 ## Scratch runtime
 
-`docker/Dockerfile.runtime` packages only the produced executable under UID/GID 65532:
+`docker/Dockerfile.runtime` packages the produced executable, project MIT license,
+original notice/source ZIP and its hash-bound inventory under UID/GID 65532.
+See [provenance](provenance.md#offline-packaged-notices) for pinned offline
+notice inputs and the distinction between a build and publication qualification:
 
 ```bash
 docker buildx build --network=none --pull=false --load \

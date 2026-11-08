@@ -30,6 +30,38 @@
       "evidence": "Final SG00/SG04-SG06 and cold-reproduction receipts registered in qualification/gate-status.json",
       "not_claimed": ["production write capability", "SG13 release completion"]
     },
+    "runtime_notice_packaging": {
+      "status": "passed_scoped_observed_binary_component",
+      "evidence_root": "/srv/splicery-evidence/runtime-notice-closure-7svxnt_1",
+      "build": {
+        "receipt": "build-notices-005.json",
+        "sha256": "9357753618a183d093a484c1644eecca0dad1def75ea8adf99f4f1e38a460438"
+      },
+      "cached_repeat": {
+        "receipt": "build-notices-006.json",
+        "sha256": "b686b17783c6e2ea19f88b4790f4433151ef6bf78cc119d9ad0ea0f59d9750d5"
+      },
+      "scratch_package": {
+        "receipt": "scratch-package-001.json",
+        "sha256": "22b7936886dcab158b0976ede1d2bd5297b4a1520fc2c0e36774adbc6cf76799"
+      },
+      "refusals": {
+        "receipt": "refusal-controls-001.json",
+        "sha256": "e6309d2450c64fc136efaf2590fd93081f34a3c20bb7e47bc3ffb9b10de73ddb",
+        "cases": 3
+      },
+      "standalone_sbom": {
+        "receipt": "sbom-001.json",
+        "sha256": "524ac96528e602c646becc5eeeea122dd1fece320d1e8c8922120fbdbcaa2b9c"
+      },
+      "executable_sha256": "db79d50147cc51d7183b18474d1ea9f3f6eb935e14f7c7f8719e7fdea3965081",
+      "cargo_packages": 43,
+      "conservative_runtime_packages": 28,
+      "observed_link_inputs": 55,
+      "nonruntime_missing_originals": ["convert_case 0.4.0"],
+      "applicability": "Exact manifests in receipts; later documentation/status edits are not re-labelled as executed source.",
+      "not_claimed": ["complete build-tool notice coverage", "general legal clearance", "SG13 completion", "public readiness"]
+    },
     "host_integration": {
       "status": "externally_blocked",
       "blockers": [

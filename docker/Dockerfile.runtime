@@ -1,4 +1,7 @@
 FROM scratch
 COPY splicery /usr/bin/splicery
+COPY notices/LICENSE /usr/share/licenses/splicery/LICENSE
+COPY notices/third-party-licenses.zip /usr/share/licenses/splicery/third-party-licenses.zip
+COPY notices/third-party-licenses.json /usr/share/licenses/splicery/third-party-licenses.json
 USER 65532:65532
 ENTRYPOINT ["/usr/bin/splicery"]
