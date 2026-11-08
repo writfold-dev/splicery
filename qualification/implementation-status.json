@@ -25,7 +25,9 @@
       "not_claimed": ["liveness", "production host qualification", "Lean-to-TLA equivalence"]
     },
     "sg08_identity_contract": {
-      "status": "passed_local_proposal_component",
+      "status": "superseded_by_owner_contract",
+      "superseded_by": "writfold-dev/writfold qualification/worktree-identity-profile.json (writfold-worktree/1, wfwt1 identities)",
+      "disposition": "Local proposal predates and diverges from the owner contract (domain prefix, map vs array CBOR, effect vs observation kind, request-key composition). Retained unchanged; not an identity source.",
       "evidence": "python3 -B tools/check_sg08_identity.py; qualification/sg08-identity-vectors.json",
       "checks": "7 fixed golden vectors including Writfold calibration, exact smoke fixture/cross-references, and 7 adverse identity controls",
       "not_claimed": ["owner publication", "RPC admission", "edit authority", "SG08 gate pass"]
