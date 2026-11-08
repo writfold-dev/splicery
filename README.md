@@ -16,6 +16,7 @@ edit "sdk/src/client.rs" {
 | If you want to… | Open |
 |---|---|
 | Implement the first slice | [Agent intake and first PR](AGENT_START_HERE.md) |
+| Review the SG08 identity proposal | [Owner protocol and golden-vector checker](protocol/worktree.md#identity-and-lifecycle) |
 | Review the syntax | [EBNF](spec/splicery.ebnf), [language semantics](spec/language.md), [lowering and IR](spec/resolved-ir.md), [worked examples](examples/README.md) |
 | See the flow and ownership | [Interface and protocol](protocol/worktree.md), [worked exchange](protocol/example.json) |
 | Audit type and build boundaries | [Rust, nominal types and quality](guide/engineering.md) |

@@ -10,14 +10,14 @@
 
 ## Sibling cross-check
 
-The handover pins match both committed local HEADs exactly:
+The original handover review used these exact pins:
 
 | Repository | Commit |
 |---|---|
 | `writfold-dev/writfold` | `b202ae28d41a883a21d1e3a082b5cb6426b385d6` |
 | `writfold-dev/weft` | `db116fd773b593c8ee16cbb322f1822f3fb067a7` |
 
-Both sibling worktrees also contain unrelated uncommitted operator work. Splicery reads them only as references and does not modify, commit, or claim evidence from that work. Weft proof reports carry no Splicery edit authority, and neither sibling is a Splicery kernel dependency.
+At review start, the Writfold checkout was `8d411f60f8b4ca3fa2ed69e9c28c0a95848170f1`. The fresh receipt `~/.local/share/writfold/evidence/toolchain-smoke-splicery-resume-20261106-001.json` records eight passing component checks against Splicery `c696b6e3e60938c2b19081c38801e0d67ced8df2`, while full end-to-end status remained blocked. It binds executable hashes and exact source manifests, not the Writfold Git commit, and does not cover subsequent checkout changes. Splicery reads sibling sources only as references and does not modify them or add a mutable sibling dependency. Weft proof reports carry no Splicery edit authority.
 
 ## Admitted local tools and evidence
 
@@ -31,7 +31,7 @@ Both sibling worktrees also contain unrelated uncommitted operator work. Splicer
 ## Writfold/Weft boundaries
 
 - Writfold P01O/WF24 retained-branch Omnigraph relocation remains blocked. Storage-dependent production integration must not adopt a fallback or claim a host receipt.
-- The owner-published shared-stdio contract artifact required by WR5 is not yet published. Current uncommitted sibling stdio work is not a pinned integration contract.
+- Writfold's control-only stdio schemas, vectors and initialized session are now pinned and exercised. The owner-published worktree data/effect contract, persistent handoff and authorized execution methods required by SG08/WR5–WR8 are still absent; transport control alone does not close them.
 - Weft WR6–WR8 procedure/run-start admissions remain external dependencies. A local Splicery or Weft binary cannot manufacture them.
 - Revision 5 remains Writfold implementation authority; deferred revision-9 universal per-proposal Lean certificates are not assumed.
 - Splicery preview and proof components do not enable production writes. The first write-enabled demonstration still requires the real Writfold host, Worktrunk binding, native materializer and applicable SG07–SG10/WF receipts.

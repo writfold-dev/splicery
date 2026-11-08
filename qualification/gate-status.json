@@ -9,7 +9,7 @@
     "SG05": {"status": "pass", "receipts": ["verus-final-001/verus-receipt.json", "differential-final-001/differential-receipt.json"]},
     "SG06": {"status": "pass", "receipts": ["fuzz-final-001/fuzz-receipt.json"]},
     "SG07": {"status": "pass", "receipts": ["sg07-final-001/model-receipt.json"]},
-    "SG08": {"status": "blocked", "blockers": ["owner-published shared-stdio contract artifact", "real Worktrunk/native-effect receipts"]},
+    "SG08": {"status": "blocked", "blockers": ["owner-published worktree data/effect schema and vectors", "real run/grant/Worktrunk binding and native-effect receipts"]},
     "SG09": {"status": "blocked", "blockers": ["native WSL descriptor/materializer evidence requires SG08"]},
     "SG10": {"status": "blocked", "blockers": ["real adapter crash/retry and Run Watch evidence requires SG09"]},
     "SG11": {"status": "blocked", "blockers": ["native lifecycle and multi-repository evidence requires SG10"]},
