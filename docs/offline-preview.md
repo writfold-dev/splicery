@@ -55,6 +55,10 @@ splicery preview --root /path/to/worktree \
 
 Offsets are zero-based bytes into the original image, not UTF-16 or editor columns. Captures are offline aliases only; they confer no authority.
 
+## Line bindings
+
+A bare line target selects the line body without its terminator, and `after` inserts at the end of the selection ([language §3 and §7](../spec/language.md#binding-selection-and-execution)). So `after @line insert lines like @line [...]` places the new lines before `@line`'s terminator and joins the two lines, and `delete @line` leaves an empty line. To insert whole lines, insert `before` the following line (as [09-import](../examples/09-import.spl) does) or select the line together with its terminator using `one text`. The preview prints a `note:` on stderr, with the statement's recipe byte span, when a recipe contains either construct; stdout is unchanged and the meaning is not altered. Changing that meaning is a language-contract change covering the spec, the Lean surface calculus and the trusted rehearsal; it is not made by the preview.
+
 ## Primitive differential interface
 
 ```bash
@@ -66,9 +70,7 @@ The command accepts `apply LO WIDTH INPUT_HEX REPLACEMENT_HEX`, with at most 409
 
 ## Admitted syntax and limits
 
-The preview accepts file-edit blocks and path-bound fragments, `@name :=` bindings, references, `one text`, `one hex`, `range`, `replace`, `delete`, `before`, `after`, STRING, HEX, HEREDOC and `keep`. It enforces strict recipe UTF-8, original-coordinate reads, unique overlapping matches, source-order/no-shadow binding, UTF-8 boundaries, overlap refusal and input/candidate/payload limits.
-
-Other /1 productions return `Unsupported`: file lifecycle operations, `one line`, `between`, iteration, regex/frozen sets, capture groups, `lines like` and `indent`. These omissions are not hidden by a fallback and are not a complete /1 profile claim.
+The preview accepts the /1 grammar: file-edit blocks and path-bound fragments, `@name :=` bindings, references and capture groups, `one text`, `one line`, `one hex`, `between`, `range`, `replace`, `delete`, `before`, `after`, `each ... in line_matches`/`frozen` iteration, STRING, HEX, HEREDOC, `keep`, `lines like` and `indent`. It enforces strict recipe UTF-8, original-coordinate reads, unique overlapping matches, source-order/no-shadow binding, UTF-8 boundaries, overlap refusal and input/candidate/payload/match limits. `create`, `rename` and `remove` print a typed file plan and are never executed. An offline preview is a scoped component, not a complete /1 profile claim.
 
 ## Scratch runtime
 

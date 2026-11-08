@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 
-use splicery_compile::{lower, regex::match_lines};
+use splicery_compile::{advisory::line_body_advisories, lower, regex::match_lines};
 use splicery_domain::{
     Budget, CaptureBinding, FrozenSet, MAX_INPUT_BYTES, OriginalImage, Plan, Profile, ReadCapture,
     ResolvedCapture, SourceSpan,
@@ -261,6 +261,9 @@ fn preview(args: PreviewArgs) -> Result<Vec<u8>, String> {
         parse_recipe(&source, args.file.as_deref()).map_err(|error| format!("{error:?}"))?;
     match &recipe {
         Recipe::Edit { raw, .. } => {
+            for note in line_body_advisories(&recipe) {
+                let _ = writeln!(io::stderr().lock(), "{note}");
+            }
             let profile = if *raw { Profile::Raw } else { Profile::Text };
             let image = read_image(&args.root, recipe.path(), profile)?;
             let captures = args

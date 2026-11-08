@@ -4,6 +4,7 @@ use splicery_domain::{
 };
 use splicery_syntax::ast::{Recipe, Statement};
 
+pub mod advisory;
 mod environment;
 mod file_plan;
 mod iteration;
