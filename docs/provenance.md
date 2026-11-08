@@ -14,7 +14,7 @@ The original handover review used these exact pins:
 
 | Repository | Commit |
 |---|---|
-| `writfold-dev/writfold` | `b202ae28d41a883a21d1e3a082b5cb6426b385d6` |
+| `writfold-dev/writfold` | `8e5763726b864640967adab90a3bdbaa61393bdf` |
 | `writfold-dev/weft` | `db116fd773b593c8ee16cbb322f1822f3fb067a7` |
 
 At review start, the Writfold checkout was `8d411f60f8b4ca3fa2ed69e9c28c0a95848170f1`. The fresh receipt `~/.local/share/writfold/evidence/toolchain-smoke-splicery-resume-20261106-001.json` records eight passing component checks against Splicery `c696b6e3e60938c2b19081c38801e0d67ced8df2`, while full end-to-end status remained blocked. It binds executable hashes and exact source manifests, not the Writfold Git commit, and does not cover subsequent checkout changes. Splicery reads sibling sources only as references and does not modify them or add a mutable sibling dependency. Weft proof reports carry no Splicery edit authority.
