@@ -55,7 +55,7 @@ def main() -> int:
         registry.mkdir()
         run([
             "docker", "run", "--rm", "--network", "none",
-            "-v", "~/.cargo/registry:/seed:ro",
+            "-v", f"{Path('~/.cargo/registry').expanduser()}:/seed:ro",
             "-v", f"{registry}:/registry",
             "splicery-tools:qualification", "sh", "-c", "cp -a /seed/. /registry/",
         ], output / "seed-registry.log")
