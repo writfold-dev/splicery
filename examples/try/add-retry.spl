@@ -1,0 +1,5 @@
+edit "client.rs" {
+  @bind := one text "let conn = open(url)?;"
+  @call := one text "open(url)" within @bind
+  replace @call with ["with_retry(3, || ", keep(@call), ")"]
+}

@@ -11,6 +11,26 @@ edit "sdk/src/client.rs" {
 }
 ~~~
 
+## Try it
+
+Build from source on Linux x86_64 (needs [rustup](https://rustup.rs); the
+pinned toolchain installs on first build), then preview an edit to a small Rust
+file. Preview prints the candidate file and never writes to disk:
+
+```sh
+cargo build --release --locked
+SPLICERY=$PWD/target/release/splicery-cli
+cd examples/try
+"$SPLICERY" preview --root . --file client.rs add-retry.spl
+"$SPLICERY" preview --root . --file client.rs --report add-retry.spl
+```
+
+[`add-retry.spl`](examples/try/add-retry.spl) wraps the `open(url)` call inside
+`connect` with a retry and leaves the identical call in `probe` alone. A text
+that matches zero or several times, or overlapping edits, is refused rather than
+guessed. Applying an edit to a real worktree belongs to Writfold and is not
+part of this binary. More recipes are in [examples](examples/README.md).
+
 **Choose your starting point**
 
 | If you want to… | Open |
