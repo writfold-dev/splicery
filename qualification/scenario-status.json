@@ -21,7 +21,7 @@
     "C18": {"status": "blocked", "blockers": ["native create/remove/rename races require SG09"]},
     "C19": {"status": "blocked", "blockers": ["initialized owner transport and host capability negotiation require SG08"]},
     "C20": {"status": "blocked", "blockers": ["authorized Run Watch projections require the owner service"]},
-    "C21": {"status": "pass", "evidence": ["proofs-final-001/proof-receipt.json", "verus-final-001/verus-receipt.json", "fuzz-final-001/fuzz-receipt.json"], "cases": ["quality-and-proof-negative-controls"]},
+    "C21": {"status": "blocked", "blockers": ["fresh evidence needed: the Verus receipt is retired with the Verus kernel family; the proofs gate's axiom audit and mutant calibration replace it once SG05 is re-admitted"], "superseded_evidence": ["proofs-final-001/proof-receipt.json", "verus-final-001/verus-receipt.json", "fuzz-final-001/fuzz-receipt.json"], "cases": ["quality-and-proof-negative-controls"]},
     "C22": {"status": "pass", "evidence": ["preflight-final-001/preflight-receipt.json", "reproduction-final-001/reproduction-receipt.json", "aggregator-final-001/valid-receipt.json"], "cases": ["cold-offline-rebuild-and-admission-refusals"]},
     "C23": {"status": "blocked", "blockers": ["held-out two-harness usability benchmark requires SG12"]},
     "C24": {"status": "blocked", "blockers": ["stale preview, revocation and other-worktree authority require the host"]}

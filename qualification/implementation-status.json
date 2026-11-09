@@ -34,9 +34,39 @@
     },
     "rust_binary": {
       "status": "passed_offline_static_preview_component",
-      "layout": ["splicery-domain", "splicery-syntax", "splicery-compile", "splicery-kernel", "splicery-wire", "splicery-cli"],
+      "layout": ["splicery-domain", "splicery-syntax", "splicery-compile", "splicery-splice", "splicery-kernel", "splicery-wire", "splicery-cli"],
       "evidence": "Final SG00/SG04-SG06 and cold-reproduction receipts registered in qualification/gate-status.json",
       "not_claimed": ["production write capability", "SG13 release completion"]
+    },
+    "kernel_proofs": {
+      "status": "passed_aeneas_lean_component",
+      "method": "Lean 4 theorems over the Charon/Aeneas translation of crates/splicery-splice, the dependency-free kernel production calls through splicery-kernel",
+      "command": "docker compose run --build --rm proofs",
+      "documentation": "proofs/README.md",
+      "toolchain": {
+        "charon": "8cae8fd1905946de61147a65ecdd7122cc6b491b",
+        "aeneas": "nightly-2026.11.07-c5eb4a2 (sha256 14fbaed4ce8624cf3d668f887d6ebb237a59cc37d7498c792d9f3f97332cbb25)",
+        "lean": "leanprover/lean4:v4.35.0",
+        "mathlib": "56a005855ea17e0b0958f73ec801ae140b0a1679"
+      },
+      "gate_steps": ["fresh translation", "byte-identical drift check against proofs/Extracted", "lake build", "axiom audit", "mutant calibration"],
+      "audited_declarations": 105,
+      "required_claims": 25,
+      "allowed_axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "calibrated_mutants": 23,
+      "observed_run": "2026-11-09 local run, exit 0, 823 s wall time (extract 6 s, lake build 33 s, audit 3 s, 23 mutants 750 s) on a shared, loaded host; a component run, not a release receipt",
+      "proved_functions": ["same_capture", "is_continuation", "char_boundary", "check_cut", "check_edit", "piece_len", "replacement_len", "insert_by_start", "sort_by_start", "compatible", "check_canonical", "prepare", "materialize", "same_bytes", "render", "apply_at"],
+      "trust_base": ["Charon/Aeneas translation of the crate and Aeneas's Rust standard-library models", "Lean kernel", "Lean standard axioms", "rustc compiling the translated source"],
+      "not_claimed": [
+        "splicery-kernel facade mapping and its core::str::from_utf8 check of text candidates (tested)",
+        "text-profile boundary agreement with str::is_char_boundary beyond the domain's well-formed UTF-8 invariant",
+        "capture digest computation (splicery-domain, SHA-256)",
+        "syntax, lowering, frozen iteration and wire codecs (formal/, model/, differential and fuzz suites)",
+        "an SG05 receipt: SG05's Verus criterion needs an owner amendment (qualification/gate-status.json)"
+      ],
+      "retired": {
+        "verus_kernel_family": "Verus pre/postconditions for apply_at, replacement_len, candidate_len, materialize and emit_gaps (crates/splicery-kernel/src/spec.rs), scripts/run_verus.py with its four mutants and qualification/verus-trusted-base.json. The bodies moved to crates/splicery-splice and are proved there; the vstd dependency is gone. The Verus binary stays in the admitted tool image (toolchains.lock.json) and is no longer used by any Splicery body."
+      }
     },
     "runtime_notice_packaging": {
       "status": "passed_scoped_observed_binary_component",

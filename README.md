@@ -31,6 +31,32 @@ that matches zero or several times, or overlapping edits, is refused rather than
 guessed. Applying an edit to a real worktree belongs to Writfold and is not
 part of this binary. More recipes are in [examples](examples/README.md).
 
+## What is proved about the shipped kernel
+
+The pure edit kernel is `crates/splicery-splice`: a dependency-free `no_std`
+crate that production calls through `splicery-kernel`, as does Writfold's
+adapter. Its Lean theorems are **proved over the Charon/Aeneas translation of
+that crate**, not over a model of it ([proofs](proofs/README.md);
+`docker compose run --build --rm proofs`). The theorems show:
+
+- a batch is accepted exactly when it is admissible. That means at most 4096
+  edits; every target and copy is bound to this capture, inside the image and,
+  for text, on character boundaries; the payload is within 16 MiB; and every
+  pair of targets is disjoint. Every refusal names a reason that holds.
+  Acceptance and the result do not depend on authored order.
+- the candidate is the original with each target replaced in canonical order.
+  Every untouched gap and every `keep` copy is read from the original. The
+  byte counts add up. An empty batch is the identity. An oversized candidate
+  is refused, never truncated.
+- `apply_at` replaces exactly the requested bytes or refuses.
+
+The trust base is the Charon/Aeneas translation, Lean's kernel and Lean's
+standard axioms (audited). The domain-to-kernel mapping in `splicery-kernel`
+and its UTF-8 check of text candidates are tested, not proved. The language
+calculus in [formal](formal/README.md) and the TLA+ models in
+[model](model/README.md) remain models of their own scope, separate from this
+translation.
+
 **Choose your starting point**
 
 | If you want to… | Open |
@@ -40,7 +66,7 @@ part of this binary. More recipes are in [examples](examples/README.md).
 | Review the syntax | [EBNF](spec/splicery.ebnf), [language semantics](spec/language.md), [lowering and IR](spec/resolved-ir.md), [worked examples](examples/README.md) |
 | See the flow and ownership | [Interface and protocol](protocol/worktree.md), [worked exchange](protocol/example.json) |
 | Audit type and build boundaries | [Rust, nominal types and quality](guide/engineering.md) |
-| Run or extend proofs | [Lean sources and obligations](formal/README.md), [TLA+ campaign](model/README.md) |
+| Run or extend proofs | [Proofs about the shipped kernel](proofs/README.md), [Lean reference calculus and obligations](formal/README.md), [TLA+ campaign](model/README.md) |
 | Decide what may ship | [Gate catalogue](qualification/gates.md), [machine registry](qualification/gates.json), [scenario matrix](qualification/scenarios.md), [proof-to-code map](qualification/implementation-map.md) |
 | Understand existing dependencies | [Pinned owner contracts](guide/sources.md) |
 | Reproduce the handover checks | [Evidence and limits](qualification/rehearsal.md), then run python3 -B tools/check_handover.py |

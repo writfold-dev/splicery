@@ -9,11 +9,12 @@ The `splicery` executable is a static Linux x86_64 musl client for the scoped of
 | `splicery-domain` | Limits, checked source spans, immutable image and resolved IR | None |
 | `splicery-syntax` | AST, strict byte lexer and recursive-descent parser | Domain |
 | `splicery-compile` | Source-order bindings, selector resolution and lowering | Domain, syntax |
-| `splicery-kernel` | Checked batches, exact rendering and Verus `apply_at` | Domain, `vstd` |
+| `splicery-splice` | Pure byte-splice kernel: batch validation, canonical order, rendering, `apply_at`; proved over its Aeneas translation ([proofs](../proofs/README.md)) | None (`no_std` + `alloc`) |
+| `splicery-kernel` | Maps checked domain batches onto `splicery-splice`; UTF-8 check of text candidates | Domain, splice |
 | `splicery-wire` | Bounded numeric/hex and exact JSON report codecs | Domain, kernel |
 | `splicery-cli` | Arguments, contained regular-file reads and stdout | All five |
 
-The syntax and kernel crates have no filesystem, Git, network, shell, database, Writfold or Weft dependency. The wire layer makes no authorization decision.
+The syntax, splice and kernel crates have no filesystem, Git, network, shell, database, Writfold or Weft dependency. The wire layer makes no authorization decision.
 
 ## Build
 
