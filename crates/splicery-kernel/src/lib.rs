@@ -1,11 +1,13 @@
+//! The Splicery edit kernel as production calls it.
+//!
+//! Every decision — batch validation, canonical ordering, rendering and
+//! `apply_at` — is made by `splicery-splice`, whose Aeneas translation is
+//! proved in `proofs/`. This facade only maps the checked domain types onto
+//! the kernel's plain data and back, and adds one check the kernel does not
+//! make: a text-profile candidate must be well-formed UTF-8, decided by
+//! `core::str::from_utf8` (tested, not proved).
 use splicery_domain::{EditTarget, OriginalImage, Part, Profile, RecipeSpan, SourceSpan, Splice};
-#[cfg(verus_keep_ghost)]
-use vstd::assert_seqs_equal;
-#[cfg(verus_keep_ghost)]
-use vstd::prelude::*;
-
-mod spec;
-use spec::{candidate_len, emit_gaps, materialize};
+use splicery_splice as kernel;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Candidate {
@@ -29,38 +31,100 @@ impl Candidate {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KernelError {
+    OutOfBounds,
+    Overlap,
+    TooManySplices,
+    PayloadTooLarge,
+    CandidateTooLarge,
+    InvalidUtf8Boundary,
+    NoChange,
+}
+
+impl From<kernel::Refusal> for KernelError {
+    fn from(refusal: kernel::Refusal) -> Self {
+        match refusal {
+            kernel::Refusal::OutOfBounds => Self::OutOfBounds,
+            kernel::Refusal::Overlap => Self::Overlap,
+            kernel::Refusal::TooManySplices => Self::TooManySplices,
+            kernel::Refusal::PayloadTooLarge => Self::PayloadTooLarge,
+            kernel::Refusal::CandidateTooLarge => Self::CandidateTooLarge,
+            kernel::Refusal::InvalidUtf8Boundary => Self::InvalidUtf8Boundary,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EditReport {
+    pub target: EditTarget,
+    pub replacement: Vec<u8>,
+    pub origin: RecipeSpan,
+}
+
+/// A batch the kernel accepted: the splices in canonical order, plus the
+/// kernel's own view of them (authored order) and the canonical order it
+/// returned, which `render` replays.
 #[derive(Clone, Debug)]
 pub struct PreparedBatch {
     image: OriginalImage,
     splices: Vec<Splice>,
+    edits: Vec<kernel::Edit>,
+    order: Vec<usize>,
+}
+
+fn cut(capture_sha256: [u8; 32], lo: usize, hi: usize) -> kernel::Cut {
+    kernel::Cut {
+        capture: capture_sha256,
+        lo,
+        hi,
+    }
+}
+
+fn target_cut(target: EditTarget) -> kernel::Cut {
+    cut(target.capture_sha256(), target.lo(), target.hi())
+}
+
+fn span_cut(span: SourceSpan) -> kernel::Cut {
+    cut(span.capture_sha256(), span.lo(), span.hi())
+}
+
+fn kernel_edit(splice: &Splice) -> kernel::Edit {
+    kernel::Edit {
+        target: target_cut(splice.target),
+        parts: splice
+            .replacement
+            .iter()
+            .map(|part| match part {
+                Part::Literal(bytes) => kernel::Piece::Literal(bytes.clone()),
+                Part::Copy(span) => kernel::Piece::Copy(span_cut(*span)),
+            })
+            .collect(),
+    }
 }
 
 impl PreparedBatch {
-    pub fn new(image: OriginalImage, mut splices: Vec<Splice>) -> Result<Self, KernelError> {
-        if splices.len() > 4096 {
-            return Err(KernelError::TooManySplices);
-        }
-        let mut payload_bytes = 0usize;
-        for splice in &splices {
-            let replacement_bytes = validate_splice(&image, splice)?;
-            payload_bytes = payload_bytes
-                .checked_add(replacement_bytes)
-                .ok_or(KernelError::PayloadTooLarge)?;
-            if payload_bytes > 16 * 1024 * 1024 {
-                return Err(KernelError::PayloadTooLarge);
-            }
-        }
-        splices.sort_by_key(|splice| splice.target.lo());
-        for pair in splices.windows(2) {
-            let left = &pair[0].target;
-            let right = &pair[1].target;
-            if left.hi() > right.lo()
-                || (left.hi() == right.lo() && (left.width() == 0 || right.width() == 0))
-            {
-                return Err(KernelError::Overlap);
-            }
-        }
-        Ok(Self { image, splices })
+    pub fn new(image: OriginalImage, splices: Vec<Splice>) -> Result<Self, KernelError> {
+        let edits: Vec<kernel::Edit> = splices.iter().map(kernel_edit).collect();
+        let order = kernel::prepare(
+            image.bytes(),
+            image.profile() == Profile::Text,
+            &image.capture_sha256(),
+            &edits,
+        )?;
+        // `order` is a permutation of the splice positions
+        // (`prepare_order_perm`), so every slot is taken exactly once.
+        let mut slots: Vec<Option<Splice>> = splices.into_iter().map(Some).collect();
+        let splices = order
+            .iter()
+            .filter_map(|&index| slots.get_mut(index).and_then(Option::take))
+            .collect();
+        Ok(Self {
+            image,
+            splices,
+            edits,
+            order,
+        })
     }
 
     pub fn image(&self) -> &OriginalImage {
@@ -71,142 +135,33 @@ impl PreparedBatch {
     }
 }
 
-fn validate_span(image: &OriginalImage, span: SourceSpan) -> Result<(), KernelError> {
-    if span.capture_sha256() != image.capture_sha256() {
-        return Err(KernelError::OutOfBounds);
-    }
-    let bytes = image.bytes();
-    if span.lo() > span.hi() || span.hi() > bytes.len() {
-        return Err(KernelError::OutOfBounds);
-    }
-    if image.profile() == Profile::Text {
-        let text = std::str::from_utf8(bytes).map_err(|_| KernelError::InvalidUtf8Boundary)?;
-        if !text.is_char_boundary(span.lo()) || !text.is_char_boundary(span.hi()) {
-            return Err(KernelError::InvalidUtf8Boundary);
-        }
-    }
-    Ok(())
-}
-
-fn validate_target(image: &OriginalImage, target: EditTarget) -> Result<(), KernelError> {
-    if target.capture_sha256() != image.capture_sha256() {
-        return Err(KernelError::OutOfBounds);
-    }
-    let bytes = image.bytes();
-    if target.lo() > target.hi() || target.hi() > bytes.len() {
-        return Err(KernelError::OutOfBounds);
-    }
-    if image.profile() == Profile::Text {
-        let text = std::str::from_utf8(bytes).map_err(|_| KernelError::InvalidUtf8Boundary)?;
-        if !text.is_char_boundary(target.lo()) || !text.is_char_boundary(target.hi()) {
-            return Err(KernelError::InvalidUtf8Boundary);
-        }
-    }
-    Ok(())
-}
-
-fn validate_splice(image: &OriginalImage, splice: &Splice) -> Result<usize, KernelError> {
-    validate_target(image, splice.target)?;
-    for part in &splice.replacement {
-        if let Part::Copy(span) = part {
-            validate_span(image, *span)?;
-        }
-    }
-    spec::replacement_len(image.bytes(), splice)
-}
-
 pub fn render(batch: &PreparedBatch) -> Result<Candidate, KernelError> {
     let input = batch.image.bytes();
-    let output_len = candidate_len(input, &batch.splices)?;
-    let (bytes, edits) = if let [splice] = batch.splices.as_slice() {
-        let replacement = materialize(input, splice)?;
-        let bytes = apply_at(
-            input,
-            splice.target.lo(),
-            splice.target.width(),
-            &replacement,
-        )
-        .ok_or(KernelError::OutOfBounds)?;
-        let edits = vec![EditReport {
+    let rendered = kernel::render(input, &batch.edits, &batch.order)?;
+    if batch.image.profile() == Profile::Text && std::str::from_utf8(&rendered.bytes).is_err() {
+        return Err(KernelError::InvalidUtf8Boundary);
+    }
+    let edits = batch
+        .splices
+        .iter()
+        .zip(rendered.replacements)
+        .map(|(splice, replacement)| EditReport {
             target: splice.target,
             replacement,
             origin: splice.origin,
-        }];
-        (bytes, edits)
-    } else {
-        emit_gaps(input, &batch.splices, output_len)?
-    };
-    if batch.image.profile() == Profile::Text && std::str::from_utf8(&bytes).is_err() {
-        return Err(KernelError::InvalidUtf8Boundary);
-    }
-    let no_change = bytes == input;
+        })
+        .collect();
     Ok(Candidate {
-        bytes,
+        bytes: rendered.bytes,
         edits,
-        no_change,
+        no_change: rendered.no_change,
     })
 }
 
-vstd::prelude::verus! {
-
-pub open spec fn seq_len<T>(items: Seq<T>) -> int {
-    items.len() as int
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum KernelError {
-    OutOfBounds, Overlap, TooManySplices, PayloadTooLarge, CandidateTooLarge,
-    InvalidUtf8Boundary, NoChange,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EditReport {
-    pub target: EditTarget,
-    pub replacement: Vec<u8>,
-    pub origin: RecipeSpan,
-}
-
-/// Replace exactly `width` bytes at `lo`, refusing invalid cuts and oversized output.
-pub fn apply_at(input: &[u8], lo: usize, width: usize, replacement: &[u8])
-    -> (result: Option<Vec<u8>>)
-    requires
-        seq_len(input@) <= 8 * 1024 * 1024,
-        seq_len(replacement@) <= 16 * 1024 * 1024,
-    ensures
-        match result {
-            Some(output) => {
-                lo as int <= seq_len(input@)
-                && width as int <= seq_len(input@) - lo as int
-                && seq_len(output@) == seq_len(input@) - width as int + seq_len(replacement@)
-                && seq_len(output@) <= 16 * 1024 * 1024
-                && output@ == input@.subrange(0, lo as int)
-                    + replacement@
-                    + input@.subrange(lo as int + width as int, seq_len(input@) as int)
-            },
-            None => true,
-        },
-{
-    if lo > input.len() { return None; }
-    let remaining = input.len() - lo;
-    if width > remaining { return None; }
-    let suffix_start = lo + width;
-    let retained = input.len() - width;
-    let output_len = retained.checked_add(replacement.len())?;
-    if output_len > 16 * 1024 * 1024 { return None; }
-    let mut output = Vec::with_capacity(output_len);
-    output.extend_from_slice(&input[..lo]);
-    output.extend_from_slice(replacement);
-    output.extend_from_slice(&input[suffix_start..]);
-    proof {
-        assert_seqs_equal!(
-            output@ == input@.subrange(0, lo as int)
-                + replacement@
-                + input@.subrange(lo as int + width as int, seq_len(input@) as int)
-        );
-    }
-    Some(output)
-}
-
+/// Replace exactly `width` bytes at `lo`, refusing invalid cuts and oversized
+/// output (`splicery_splice::apply_at`, proved as `apply_at_spec`).
+pub fn apply_at(input: &[u8], lo: usize, width: usize, replacement: &[u8]) -> Option<Vec<u8>> {
+    kernel::apply_at(input, lo, width, replacement)
 }
 
 #[cfg(test)]
@@ -325,6 +280,92 @@ mod tests {
             PreparedBatch::new(original, vec![change]).map(|_| ()),
             Err(KernelError::OutOfBounds)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn kernel_limits_match_domain() {
+        assert_eq!(splicery_splice::MAX_SPLICES, splicery_domain::MAX_SPLICES);
+        assert_eq!(
+            splicery_splice::MAX_PAYLOAD_BYTES,
+            splicery_domain::MAX_PAYLOAD_BYTES
+        );
+        assert_eq!(
+            splicery_splice::MAX_CANDIDATE_BYTES,
+            splicery_domain::MAX_CANDIDATE_BYTES
+        );
+    }
+
+    #[test]
+    fn splices_and_reports_follow_canonical_order() -> Result<(), KernelError> {
+        let original = image(b"abcdef", Profile::Raw)?;
+        let batch = PreparedBatch::new(
+            original.clone(),
+            vec![
+                splice(&original, 4, 5, vec![Part::Literal(b"Y".to_vec())])?,
+                splice(&original, 0, 1, vec![Part::Literal(b"X".to_vec())])?,
+            ],
+        )?;
+        assert_eq!(batch.splices()[0].target.lo(), 0);
+        assert_eq!(batch.splices()[1].target.lo(), 4);
+        let candidate = render(&batch)?;
+        assert_eq!(candidate.bytes(), b"XbcdYf");
+        assert_eq!(candidate.edits()[0].replacement, b"X");
+        assert_eq!(candidate.edits()[1].replacement, b"Y");
+        assert_eq!(candidate.edits()[1].target.lo(), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_batch_is_identity() -> Result<(), KernelError> {
+        let original = image(b"abc", Profile::Text)?;
+        let candidate = render(&PreparedBatch::new(original, Vec::new())?)?;
+        assert!(candidate.no_change());
+        assert_eq!(candidate.bytes(), b"abc");
+        assert!(candidate.edits().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_text_cut_inside_a_character() -> Result<(), KernelError> {
+        let original = image("aé".as_bytes(), Profile::Text)?;
+        let inside = splice(&original, 2, 3, Vec::new())?;
+        assert_eq!(
+            PreparedBatch::new(original.clone(), vec![inside]).map(|_| ()),
+            Err(KernelError::InvalidUtf8Boundary)
+        );
+        let copy = SourceSpan::new(&original, 1, 2).ok_or(KernelError::OutOfBounds)?;
+        let copies_half = splice(&original, 0, 1, vec![Part::Copy(copy)])?;
+        assert_eq!(
+            PreparedBatch::new(original, vec![copies_half]).map(|_| ()),
+            Err(KernelError::InvalidUtf8Boundary)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn refuses_more_than_max_splices_before_anything_else() -> Result<(), KernelError> {
+        let original = image(b"abc", Profile::Raw)?;
+        let one = splice(&original, 0, 0, Vec::new())?;
+        let many = vec![one; splicery_domain::MAX_SPLICES + 1];
+        assert_eq!(
+            PreparedBatch::new(original, many).map(|_| ()),
+            Err(KernelError::TooManySplices)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_overlap_in_any_authored_order() -> Result<(), KernelError> {
+        let original = image(b"abcdef", Profile::Raw)?;
+        let first = splice(&original, 1, 4, Vec::new())?;
+        let second = splice(&original, 3, 5, Vec::new())?;
+        for batch in [vec![first.clone(), second.clone()], vec![second, first]] {
+            assert_eq!(
+                PreparedBatch::new(original.clone(), batch).map(|_| ()),
+                Err(KernelError::Overlap)
+            );
+        }
         Ok(())
     }
 

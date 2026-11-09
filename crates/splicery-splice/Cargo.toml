@@ -1,0 +1,25 @@
+[package]
+name = "splicery-splice"
+description = "Splicery's pure byte-splice kernel in plain safe Rust, translated to Lean 4 by Charon/Aeneas and proved under proofs/"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# No dependencies, by construction: no IO, no floats, no `dyn`, `no_std` +
+# `alloc`. Everything this crate decides is translated and proved; the
+# `splicery-kernel` facade maps the checked domain types onto it.
+[dependencies]
+
+# Read by Charon when the `proofs` gate translates this crate
+# (proofs/extract.sh). Translation starts from the decision module and
+# follows what it reaches; the conveniences in `convenience.rs` (Debug,
+# Clone, PartialEq) are never reached, so they stay outside the proved
+# surface.
+[package.metadata.charon]
+start_from = ["splicery_splice::splice"]
+
+[lints]
+workspace = true

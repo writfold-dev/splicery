@@ -3,6 +3,7 @@ members = [
     "crates/splicery-domain",
     "crates/splicery-syntax",
     "crates/splicery-compile",
+    "crates/splicery-splice",
     "crates/splicery-kernel",
     "crates/splicery-wire",
     "crates/splicery-cli",
@@ -21,9 +22,9 @@ publish = false
 splicery-domain = { path = "crates/splicery-domain" }
 splicery-syntax = { path = "crates/splicery-syntax" }
 splicery-compile = { path = "crates/splicery-compile" }
+splicery-splice = { path = "crates/splicery-splice" }
 splicery-kernel = { path = "crates/splicery-kernel" }
 splicery-wire = { path = "crates/splicery-wire" }
-vstd = "=0.0.0-2026-09-06-0133"
 regex = "=1.11.1"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
@@ -31,7 +32,6 @@ sha2 = "=0.11.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
