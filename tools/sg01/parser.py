@@ -314,6 +314,16 @@ class Parser:
             self.expect("KW_AND")
             second = self.reference()
             return self.node("between", start, second["span"]["end"], first=first, second=second)
+        if self.current.kind == "KW_FROM":
+            start = self.advance().start
+            first = self.reference()
+            self.expect("KW_TO")
+            second = self.reference()
+            return self.node("from_to", start, second["span"]["end"], first=first, second=second)
+        if self.current.kind == "KW_WHOLE":
+            start = self.advance().start
+            line = self.reference()
+            return self.node("whole", start, line["span"]["end"], line=line)
         if self.current.kind == "KW_RANGE":
             start = self.advance().start
             self.expect("LBRACKET")
@@ -330,7 +340,7 @@ class Parser:
                 low_decimal=low.value,
                 high_decimal=high.value,
             )
-        self.fail("expected_selector", "expected a reference, one, between, or range")
+        self.fail("expected_selector", "expected a reference, one, between, from, whole, or range")
 
     def payload(self, depth: int) -> dict[str, Any]:
         if depth > self.config.max_depth:

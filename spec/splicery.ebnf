@@ -16,6 +16,8 @@ collection   = "line_matches" RX [ "within" reference ] "expect" NAT
 selector     = reference
              | "one" ( "text" STRING | "line" STRING | HEX ) [ "within" reference ]
              | "between" reference "and" reference
+             | "from" reference "to" reference
+             | "whole" reference
              | "range" "[" NAT "," NAT ")" ;
 reference    = HANDLE [ "." NAME ] ;
 payload      = piece | "[" [ piece { "," piece } ] "]" ;

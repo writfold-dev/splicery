@@ -20,7 +20,8 @@ fn rejects_empty_needles_bad_ranges_excess_matches_and_delete_payload() -> Resul
         empty.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::MissingSelector,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     let excessive = lower_splices(
@@ -39,7 +40,8 @@ fn rejects_empty_needles_bad_ranges_excess_matches_and_delete_payload() -> Resul
         excessive.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::TooManyMatches,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     assert_eq!(
@@ -51,7 +53,8 @@ fn rejects_empty_needles_bad_ranges_excess_matches_and_delete_payload() -> Resul
         .map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::OutOfBounds,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     assert_eq!(
@@ -67,7 +70,8 @@ fn rejects_empty_needles_bad_ranges_excess_matches_and_delete_payload() -> Resul
         .map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::Unsupported,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())
@@ -86,6 +90,7 @@ fn rejects_foreign_capture_spans() -> Result<(), ()> {
         Err(CompileDiagnostic {
             kind: CompileError::OutOfBounds,
             origin: CAPTURE_ORIGIN,
+            detail: None
         })
     );
 
@@ -99,6 +104,7 @@ fn rejects_foreign_capture_spans() -> Result<(), ()> {
         Err(CompileDiagnostic {
             kind: CompileError::OutOfBounds,
             origin: CAPTURE_ORIGIN,
+            detail: None
         })
     );
     Ok(())

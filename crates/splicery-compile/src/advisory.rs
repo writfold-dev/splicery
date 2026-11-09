@@ -32,14 +32,14 @@ impl fmt::Display for Advisory {
                 formatter,
                 "note: recipe bytes [{start},{end}): `after` a line binding inserts at the end \
                  of its body, before the line terminator, so a `lines like` payload joins the \
-                 two lines; insert `before` the following line, or select the line with its \
-                 terminator using `one text` (spec/language.md §3, §7)"
+                 two lines; use `after whole @name` to insert after its terminator \
+                 (spec/language.md §3, §7)"
             ),
             AdvisoryKind::DeleteLineBody => write!(
                 formatter,
                 "note: recipe bytes [{start},{end}): `delete` of a line binding removes its \
-                 body only and leaves an empty line; select the line with its terminator using \
-                 `one text` to remove the whole line (spec/language.md §3, §7)"
+                 body only and leaves an empty line; use `delete whole @name` to remove the \
+                 line with its terminator (spec/language.md §3, §7)"
             ),
         }
     }
@@ -77,6 +77,8 @@ fn note_change(change: &Change, line_names: &[&str], notes: &mut Vec<Advisory>) 
         Selector::OneText { .. }
         | Selector::OneHex { .. }
         | Selector::Between { .. }
+        | Selector::FromTo { .. }
+        | Selector::Whole(_)
         | Selector::Range { .. } => false,
     };
     if !targets_line {

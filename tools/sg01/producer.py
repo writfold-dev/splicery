@@ -38,6 +38,9 @@ FIXTURE_REJECTION_CODES = [
     "expected_token",
     "trailing_input",
     "trailing_comma",
+    "expected_token",
+    "expected_token",
+    "reserved_handle",
 ]
 
 

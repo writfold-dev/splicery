@@ -1,6 +1,10 @@
 use splicery_domain::{LineEnding, MAX_MATCHES, Profile, RecipeSpan, SourceSpan};
 use splicery_syntax::ast::{Reference, Selector};
 
+use crate::anchors::{resolve_between, resolve_from_to, resolve_whole};
+use crate::detail::{
+    DetailReason, SelectorDetail, occurrences, other_line_ending, refusal, trim_blank,
+};
 use crate::environment::{
     Binding, CaptureView, Lowering, checked_span, find_binding, validate_capture,
 };
@@ -62,6 +66,10 @@ pub(crate) fn resolve_selector<'a>(
         Selector::Between { first, second } => {
             resolve_between(first, second, lowering, bindings, origin)
         }
+        Selector::FromTo { first, second } => {
+            resolve_from_to(first, second, lowering, bindings, origin)
+        }
+        Selector::Whole(reference) => resolve_whole(reference, lowering, bindings, origin),
         Selector::Range { lo, hi } => {
             let span = SourceSpan::new(lowering.image, *lo, *hi)
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
@@ -98,8 +106,11 @@ fn resolve_one<'a>(
     }
     let window = selection_window(within, lowering, bindings, origin)?;
     if needle.len() > window.width() {
-        return Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
+        return Err(missing_bytes(
+            lowering,
+            needle,
+            window,
+            within.is_some(),
             origin,
         ));
     }
@@ -107,45 +118,94 @@ fn resolve_one<'a>(
     let positions = window.width() - needle.len() + 1;
     lowering.charge(positions, origin)?;
     lowering.charge_repeated(needle.len(), positions, origin)?;
-    let bytes = lowering.image.bytes();
-    let last = window.hi() - needle.len();
-    let mut start = window.lo();
-    let mut found = None;
-    let mut match_count = 0usize;
-    loop {
+    let mut matches = SelectorDetail::new(DetailReason::Matches);
+    for start in window.lo()..window.lo() + positions {
         let end = start + needle.len();
-        if bytes.get(start..end) == Some(needle) {
-            match_count += 1;
-            if match_count > MAX_MATCHES {
+        if lowering.image.bytes().get(start..end) == Some(needle) {
+            if matches.count == MAX_MATCHES {
                 return Err(CompileDiagnostic::new(CompileError::TooManyMatches, origin));
             }
-            found = Some(start);
-        }
-        if start == last {
-            break;
-        }
-        start += 1;
-    }
-
-    match (match_count, found) {
-        (0, _) => Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
-            origin,
-        )),
-        (1, Some(start)) => {
-            let span = SourceSpan::new(lowering.image, start, start + needle.len())
+            let span = SourceSpan::new(lowering.image, start, end)
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
-            Ok(CaptureView::plain(checked_span(lowering, span, origin)?))
+            matches.record(span);
         }
-        (1, None) => Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
+    }
+    match (matches.count, matches.sites[0]) {
+        (0, _) | (1, None) => Err(missing_bytes(
+            lowering,
+            needle,
+            window,
+            within.is_some(),
             origin,
         )),
-        _ => Err(CompileDiagnostic::new(
+        (1, Some(span)) => Ok(CaptureView::plain(checked_span(lowering, span, origin)?)),
+        _ => Err(refusal(
             CompileError::AmbiguousSelector,
             origin,
+            Some(matches),
         )),
     }
+}
+
+/// A missing `one text`/`one hex`: report occurrences outside `within`, or
+/// occurrences with the other line ending, when the budget allows.
+fn missing_bytes(
+    lowering: &mut Lowering,
+    needle: &[u8],
+    window: SourceSpan,
+    scoped: bool,
+    origin: RecipeSpan,
+) -> CompileDiagnostic {
+    let image_len = lowering.image.bytes().len();
+    let mut detail = None;
+    if scoped {
+        detail = occurrences(lowering, needle, 0, image_len, DetailReason::OutsideWithin)
+            .filter(|found| found.count != 0);
+    }
+    if detail.is_none()
+        && let Some(variant) = other_line_ending(needle)
+    {
+        detail = occurrences(
+            lowering,
+            &variant,
+            window.lo(),
+            window.hi(),
+            DetailReason::LineEnding,
+        );
+    }
+    refusal(CompileError::MissingSelector, origin, detail)
+}
+
+struct LocatedLine {
+    start: usize,
+    body_end: usize,
+    ending: LineEnding,
+}
+
+fn logical_lines(bytes: &[u8]) -> impl Iterator<Item = LocatedLine> + '_ {
+    let mut start = 0usize;
+    std::iter::from_fn(move || {
+        if start >= bytes.len() {
+            return None;
+        }
+        let end = bytes[start..]
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map_or(bytes.len(), |offset| start + offset);
+        let terminated = end < bytes.len();
+        let crlf = terminated && end > start && bytes[end - 1] == b'\r';
+        let line = LocatedLine {
+            start,
+            body_end: if crlf { end - 1 } else { end },
+            ending: match (terminated, crlf) {
+                (false, _) => LineEnding::Unterminated,
+                (true, true) => LineEnding::CrLf,
+                (true, false) => LineEnding::Lf,
+            },
+        };
+        start = if terminated { end + 1 } else { bytes.len() };
+        Some(line)
+    })
 }
 
 fn resolve_one_line<'a>(
@@ -158,101 +218,71 @@ fn resolve_one_line<'a>(
     let window = selection_window(within, lowering, bindings, origin)?;
     let image_len = lowering.image.bytes().len();
     lowering.charge(image_len, origin)?;
-    let bytes = lowering.image.bytes();
+    let mut matches = SelectorDetail::new(DetailReason::Matches);
     let mut found = None;
-    let mut match_count = 0usize;
-    let mut start = 0usize;
-    while start < bytes.len() {
-        let mut end = start;
-        while end < bytes.len() && bytes[end] != b'\n' {
-            end += 1;
-        }
-        let terminated = end < bytes.len();
-        let body_end = if terminated && end > start && bytes[end - 1] == b'\r' {
-            end - 1
-        } else {
-            end
-        };
-        if start >= window.lo()
-            && body_end <= window.hi()
-            && body_end - start == needle.len()
-            && &bytes[start..body_end] == needle
+    for line in logical_lines(lowering.image.bytes()) {
+        if line.start >= window.lo()
+            && line.body_end <= window.hi()
+            && &lowering.image.bytes()[line.start..line.body_end] == needle
         {
-            match_count += 1;
-            if match_count > MAX_MATCHES {
+            if matches.count == MAX_MATCHES {
                 return Err(CompileDiagnostic::new(CompileError::TooManyMatches, origin));
             }
-            let line = if !terminated {
-                LineEnding::Unterminated
-            } else if body_end != end {
-                LineEnding::CrLf
-            } else {
-                LineEnding::Lf
-            };
-            let span = SourceSpan::new(lowering.image, start, body_end)
+            let span = SourceSpan::new(lowering.image, line.start, line.body_end)
                 .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
+            matches.record(span);
             found = Some(CaptureView {
                 span,
-                line: Some(line),
+                line: Some(line.ending),
                 groups: &[],
             });
         }
-        start = if terminated { end + 1 } else { bytes.len() };
     }
-
-    match (match_count, found) {
-        (0, _) => Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
-            origin,
-        )),
+    match (matches.count, found) {
         (1, Some(capture)) => Ok(capture),
-        (1, None) => Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
+        (0, _) | (1, None) => Err(missing_line(
+            lowering,
+            needle,
+            window,
+            within.is_some(),
             origin,
         )),
-        _ => Err(CompileDiagnostic::new(
+        _ => Err(refusal(
             CompileError::AmbiguousSelector,
             origin,
+            Some(matches),
         )),
     }
 }
 
-fn resolve_between<'a>(
-    first: &Reference,
-    second: &Reference,
+/// A missing `one line`: report lines that match after trimming spaces and
+/// tabs, or exact lines outside `within`, when the budget allows.
+fn missing_line(
     lowering: &mut Lowering,
-    bindings: &'a [Binding],
+    needle: &[u8],
+    window: SourceSpan,
+    scoped: bool,
     origin: RecipeSpan,
-) -> Result<CaptureView<'a>, CompileDiagnostic> {
-    let first = resolve_reference(first, lowering, bindings, origin)?;
-    let second = resolve_reference(second, lowering, bindings, origin)?;
-    if first.span == second.span {
-        return Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
-            origin,
-        ));
+) -> CompileDiagnostic {
+    let image_len = lowering.image.bytes().len();
+    if lowering.budget.charge(image_len).is_err() {
+        return CompileDiagnostic::new(CompileError::MissingSelector, origin);
     }
-    let first_line = first
-        .line
-        .ok_or_else(|| CompileDiagnostic::new(CompileError::InvalidCapture, origin))?;
-    if second.line.is_none() {
-        return Err(CompileDiagnostic::new(CompileError::InvalidCapture, origin));
+    let wanted = trim_blank(needle);
+    let mut trimmed = SelectorDetail::new(DetailReason::Whitespace);
+    let mut outside = SelectorDetail::new(DetailReason::OutsideWithin);
+    for line in logical_lines(lowering.image.bytes()) {
+        let body = &lowering.image.bytes()[line.start..line.body_end];
+        let Some(span) = SourceSpan::new(lowering.image, line.start, line.body_end) else {
+            continue;
+        };
+        let inside = line.start >= window.lo() && line.body_end <= window.hi();
+        if inside && !wanted.is_empty() && trim_blank(body) == wanted {
+            trimmed.record(span);
+        } else if scoped && !inside && body == needle {
+            outside.record(span);
+        }
     }
-    let eol = first_line
-        .bytes()
-        .ok_or_else(|| CompileDiagnostic::new(CompileError::MissingSelector, origin))?;
-    let full_end = first
-        .span
-        .hi()
-        .checked_add(eol.len())
-        .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
-    if full_end > second.span.lo() {
-        return Err(CompileDiagnostic::new(
-            CompileError::MissingSelector,
-            origin,
-        ));
-    }
-    let span = SourceSpan::new(lowering.image, full_end, second.span.lo())
-        .ok_or_else(|| CompileDiagnostic::new(CompileError::OutOfBounds, origin))?;
-    Ok(CaptureView::plain(checked_span(lowering, span, origin)?))
+    let detail = if trimmed.count != 0 { trimmed } else { outside };
+    refusal(CompileError::MissingSelector, origin, Some(detail))
 }

@@ -28,7 +28,8 @@ fn file_operations_are_separate_plans_and_create_is_literal_only() -> Result<(),
         lower(&unsupported, &image, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::Unsupported,
-            origin: CAPTURE_ORIGIN
+            origin: CAPTURE_ORIGIN,
+            detail: None
         })
     );
     let invalid_text = Recipe::Create {
@@ -40,7 +41,8 @@ fn file_operations_are_separate_plans_and_create_is_literal_only() -> Result<(),
         lower(&invalid_text, &image, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::WrongProfile,
-            origin: CAPTURE_ORIGIN
+            origin: CAPTURE_ORIGIN,
+            detail: None
         })
     );
 

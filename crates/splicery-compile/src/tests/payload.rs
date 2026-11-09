@@ -21,7 +21,8 @@ fn payload_forms_preserve_bytes_and_indent_only_nonempty_bodies() -> Result<(), 
         missing.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::UnknownBinding,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
 
@@ -76,7 +77,8 @@ fn raw_restrictions_and_text_boundaries_are_enforced() -> Result<(), ()> {
         lower(&one_text, &raw, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::WrongProfile,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     let raw_fragment = recipe(vec![change(
@@ -100,7 +102,8 @@ fn raw_restrictions_and_text_boundaries_are_enforced() -> Result<(), ()> {
         lower(&indent, &raw, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::WrongProfile,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
 
@@ -110,7 +113,8 @@ fn raw_restrictions_and_text_boundaries_are_enforced() -> Result<(), ()> {
         lower(&split, &text, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::WrongProfile,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     let split_literal = recipe(vec![change(
@@ -129,7 +133,8 @@ fn raw_restrictions_and_text_boundaries_are_enforced() -> Result<(), ()> {
         lower(&invalid_literal, &text, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::WrongProfile,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())

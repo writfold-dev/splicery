@@ -7,7 +7,7 @@ Exact invocation (with an already built static binary and a fresh output path):
 
 The Lean producer is invoked as `lake env lean --run Splicery/Differential.lean`
 inside --lean-project. No Python surface evaluator is used. The receipt compares
-11 surface outcomes, 10 normalized preview reports, 14 individual normalized
+13 surface outcomes, 12 normalized preview reports, 17 individual normalized
 primitive executions, and two explicit negative controls.
 """
 from __future__ import annotations
@@ -37,6 +37,8 @@ TARGETS = {
     "09-import": "sdk/src/lib.rs",
     "10-move": "cfg/service.conf",
     "11-absence": "data/table",
+    "12-whole": "sdk/src/imports.rs",
+    "13-from-to": "src/report.rs",
 }
 EXPECTED_MUTANTS = {
     "sequential-capture": ("05-swap", "6265746120626265746120"),
@@ -187,7 +189,7 @@ def main() -> int:
         receipt["static_elf"] = static_elf(binary)
         vectors = json.loads((ROOT / "qualification/recipe-vectors.json").read_text(encoding="utf-8"))
         if [vector["name"] for vector in vectors] != list(TARGETS):
-            raise ValueError("qualification vector set differs from the 11 surface targets")
+            raise ValueError("qualification vector set differs from the 13 surface targets")
         lean_command = ["lake", "env", "lean", "--run", "Splicery/Differential.lean"]
         lean_work = evidence / "lean-project"
         shutil.copytree(project, lean_work)
@@ -209,7 +211,7 @@ def main() -> int:
         )
         lean_cases = direct.get("cases")
         if not isinstance(lean_cases, list) or [case.get("name") for case in lean_cases] != list(TARGETS):
-            raise ValueError("Lean producer did not return exactly the 11 ordered vectors")
+            raise ValueError("Lean producer did not return exactly the 13 ordered vectors")
         primitive_count = 0
         report_count = 0
         for vector, lean in zip(vectors, lean_cases, strict=True):
@@ -297,7 +299,7 @@ def main() -> int:
             if target.read_bytes() != original:
                 raise ValueError(f"{name}: report/primitive checks modified the input")
         receipt["case_counts"]["normalized_primitive_executions"] = primitive_count
-        if primitive_count != 14 or report_count != 10:
+        if primitive_count != 17 or report_count != 12:
             raise ValueError("wrong primitive/report case count")
 
         mutants = direct.get("mutants")

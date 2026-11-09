@@ -162,21 +162,30 @@
     },
     {
       "id": "L06",
-      "property": "Source-order lexical scopes and complete frozen matcher evidence enforce cardinality, profile and budget refusal before a candidate.",
+      "property": "Source-order lexical scopes, complete frozen matcher evidence and anchor/line selectors (`between`, `from … to`, `whole`) enforce cardinality, ordering, profile and budget refusal before a candidate; every selection is one checked plain [lo,hi) region.",
       "lean_declarations": [
+        "Splicery.Surface.checkCapture_bounds",
         "Splicery.Surface.eachFrozen_shadow_refusal",
         "Splicery.Surface.extend_refuses_duplicate",
         "Splicery.Surface.freeze_members",
+        "Splicery.Surface.fromTo_refuses_misordered",
         "Splicery.Surface.frozen_complete_membership",
         "Splicery.Surface.incomplete_no_frozen",
         "Splicery.Surface.oneHex_empty_needle_refuses",
         "Splicery.Surface.over_budget_no_frozen",
         "Splicery.Surface.raw_no_frozen",
         "Splicery.Surface.resolveRef_unmatched_group",
+        "Splicery.Surface.select_fromTo_sound",
+        "Splicery.Surface.select_whole_sound",
+        "Splicery.Surface.selectedCut_plain",
         "Splicery.Surface.truncated_no_frozen",
+        "Splicery.Surface.whole_requires_line",
         "Splicery.Surface.wrong_expect_no_frozen"
       ],
       "production_rust_symbols": [
+        "crates/splicery-compile/src/anchors.rs::resolve_between",
+        "crates/splicery-compile/src/anchors.rs::resolve_from_to",
+        "crates/splicery-compile/src/anchors.rs::resolve_whole",
         "crates/splicery-compile/src/lib.rs::find_binding",
         "crates/splicery-compile/src/lib.rs::resolve_one",
         "crates/splicery-domain/src/lib.rs::Budget::charge",
@@ -184,13 +193,18 @@
       ],
       "positive_examples": [
         "Splicery.Surface.freeze_members and frozen_complete_membership preserve the complete checked inventory and scope.",
-        "Surface nonvacuity examples derive a singleton frozen set and source-order references."
+        "Surface nonvacuity examples derive a singleton frozen set and source-order references.",
+        "Surface examples select whole CRLF, LF and unterminated final lines (to EOF) and from/to spans covering both anchors; Differential vectors 12-whole and 13-from-to agree with the Rust preview."
       ],
       "negative_examples": [
         "Duplicate/shadowed binders, empty needles, incomplete or truncated evidence, wrong cardinality, raw profile and excess work all refuse.",
-        "Surface examples include zero, ambiguous and over-budget selections."
+        "Surface examples include zero, ambiguous and over-budget selections.",
+        "whole of a non-line capture and reversed, coincident or overlapping from/to anchors refuse."
       ],
-      "mutant_ids": ["mutant-drop-missing-optional-group"]
+      "mutant_ids": [
+        "mutant-drop-missing-optional-group",
+        "mutant-accept-overlapping-from-to"
+      ]
     },
     {
       "id": "L07",
@@ -343,6 +357,10 @@
     "mutant-ignore-write-grant": {
       "gate_scenario": "retained read-only grant negative control",
       "target": "Splicery.read_only_grant_cannot_authorize"
+    },
+    "mutant-accept-overlapping-from-to": {
+      "gate_scenario": "remove from/to anchor ordering refusal",
+      "target": "Splicery.Surface.select_fromTo_sound"
     }
   },
   "trusted_assumptions": [

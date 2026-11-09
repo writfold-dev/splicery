@@ -118,6 +118,13 @@ pub enum Selector {
         first: Reference,
         second: Reference,
     },
+    /// `from @a to @b`: both anchors and everything between them.
+    FromTo {
+        first: Reference,
+        second: Reference,
+    },
+    /// `whole @line`: a line binding together with its terminator.
+    Whole(Reference),
     Range {
         lo: usize,
         hi: usize,

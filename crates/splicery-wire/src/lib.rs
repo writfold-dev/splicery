@@ -1,8 +1,11 @@
 use splicery_domain::MAX_REPORT_BYTES;
 use splicery_kernel::Candidate;
 
+mod diff;
 mod file_plan;
 mod frozen;
+
+pub use diff::{DiffEdit, candidate_diff, unified_diff};
 
 pub use file_plan::encode_file_plan;
 pub use frozen::{PROFILE_ID, capture_digest, encode_frozen, parse_frozen};
@@ -88,5 +91,7 @@ pub fn report(path: &str, candidate: &Candidate) -> Result<String, String> {
     Ok(out)
 }
 
+#[cfg(test)]
+mod diff_tests;
 #[cfg(test)]
 mod tests;

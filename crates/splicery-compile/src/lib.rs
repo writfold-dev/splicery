@@ -5,6 +5,8 @@ use splicery_domain::{
 use splicery_syntax::ast::{Recipe, Statement};
 
 pub mod advisory;
+mod anchors;
+pub mod detail;
 mod environment;
 mod file_plan;
 mod iteration;
@@ -37,15 +39,22 @@ pub enum CompileError {
     Regex,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// A typed refusal with its recipe span. `detail` is bounded selector
+/// evidence (match sites, near misses or anchors) when the refusal has any.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompileDiagnostic {
     pub kind: CompileError,
     pub origin: RecipeSpan,
+    pub detail: Option<Box<detail::SelectorDetail>>,
 }
 
 impl CompileDiagnostic {
     fn new(kind: CompileError, origin: RecipeSpan) -> Self {
-        Self { kind, origin }
+        Self {
+            kind,
+            origin,
+            detail: None,
+        }
     }
 }
 

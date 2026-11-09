@@ -16,12 +16,19 @@ fn one_counts_overlaps_and_honors_within() -> Result<(), ()> {
         &image,
         &[],
     );
+    let refusal = ambiguous.err().ok_or(())?;
     assert_eq!(
-        ambiguous,
-        Err(CompileDiagnostic {
-            kind: CompileError::AmbiguousSelector,
-            origin: ORIGIN
-        })
+        (refusal.kind, refusal.origin),
+        (CompileError::AmbiguousSelector, ORIGIN)
+    );
+    let detail = refusal.detail.ok_or(())?;
+    let sites: Vec<_> = detail
+        .recorded()
+        .map(|span| (span.lo(), span.hi()))
+        .collect();
+    assert_eq!(
+        (detail.reason, detail.count, sites),
+        (DetailReason::Matches, 2, vec![(0, 2), (1, 3)])
     );
 
     let capture = CaptureBinding {
@@ -64,7 +71,8 @@ fn bindings_are_source_ordered_and_cannot_shadow() -> Result<(), ()> {
         unknown.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::UnknownBinding,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
 
@@ -81,7 +89,8 @@ fn bindings_are_source_ordered_and_cannot_shadow() -> Result<(), ()> {
         duplicate,
         Err(CompileDiagnostic {
             kind: CompileError::DuplicateBinding,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())
@@ -163,7 +172,8 @@ fn whole_line_identity_between_and_recorded_eols() -> Result<(), ()> {
         no_synthetic.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::MissingSelector,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
 
@@ -192,7 +202,8 @@ fn whole_line_identity_between_and_recorded_eols() -> Result<(), ()> {
         unterminated.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::InvalidCapture,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
 
@@ -211,7 +222,8 @@ fn whole_line_identity_between_and_recorded_eols() -> Result<(), ()> {
         partial.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::MissingSelector,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())
@@ -254,7 +266,8 @@ fn regex_groups_distinguish_absent_from_present_empty() -> Result<(), ()> {
         lower(&absent, &text_image(b"y")?, &[], &[]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::AbsentGroup,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())

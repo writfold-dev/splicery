@@ -240,6 +240,22 @@ private def prepare11 (image : Image) (oracle : TextOracle) : Option (List Scope
   eachFrozen [] (a "r") frozen fun env _ =>
     pure ⟨env, .replace (.reference (ref "r")) [.keep (groupRef "r" "first")]⟩
 
+private def prepare12 (image : Image) (oracle : TextOracle) : Option (List ScopedChange) := do
+  let env₁ ← bind image .text oracle [] "config"
+    (.oneLine (a "use crate::config::Config;") none)
+  let env₂ ← bind image .text oracle env₁ "shim" (.oneLine (a "// legacy shim") none)
+  pure [⟨env₂, .after (.whole (ref "config"))
+      [.linesLike (ref "config") [a "use crate::policy::Policy;"]]⟩,
+    ⟨env₂, .delete (.whole (ref "shim"))⟩]
+
+private def prepare13 (image : Image) (oracle : TextOracle) : Option (List ScopedChange) := do
+  let env₁ ← bind image .text oracle [] "open" (.oneText (a "format!(\\n") none)
+  let env₂ ← bind image .text oracle env₁ "tail" (.oneText (a "    );\\n    body") none)
+  let env₃ ← bind image .text oracle env₂ "close" (.oneText (a ")") (some (ref "tail")))
+  let env₄ ← bind image .text oracle env₃ "expr" (.fromTo (ref "open") (ref "close"))
+  pure (one env₄ (.replace (.reference (ref "expr"))
+    [.quoted (a "sanitize("), .keep (ref "expr"), .quoted (a ")")]))
+
 private def vectors : List Vector :=
   [⟨"01-await", "6c6574207265706c79203d207472616e73706f72742e73656e642872657175657374293f3b0d0a",
       .text, none, [(75, 102)], prepare01⟩,
@@ -259,7 +275,11 @@ private def vectors : List Vector :=
       .text, none, [(183, 244)], prepare09⟩,
     ⟨"10-move", "232070696e6e65640a6f7074696f6e3d6f6c640a666f6f3d310a5441494c",
       .text, none, [(99, 110), (113, 143)], prepare10⟩,
-    ⟨"11-absence", "79", .text, some "AbsentGroup", [(81, 111)], prepare11⟩]
+    ⟨"11-absence", "79", .text, some "AbsentGroup", [(81, 111)], prepare11⟩,
+    ⟨"12-whole", "7573652063726174653a3a636f6e6669673a3a436f6e6669673b0d0a7573652063726174653a3a696f3a3a526561643b0d0a2f2f206c6567616379207368696d0d0a666e206d61696e2829207b7d",
+      .text, none, [(118, 194), (197, 215)], prepare12⟩,
+    ⟨"13-from-to", "6c657420626f6479203d20666f726d617421280a2020202020202020227b7d222c0a20202020202020206e616d652c0a20202020293b0a20202020626f64790a",
+      .text, none, [(167, 217)], prepare13⟩]
 
 private def mapOption (f : α → Option β) : List α → Option (List β)
   | [] => some []

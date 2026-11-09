@@ -1,0 +1,44 @@
+[
+  {
+    "name": "wrap",
+    "file": "sdk/src/client.rs",
+    "input_text": "fn send() {\n    transport.send(request)\n}\n",
+    "output_text": "fn send() {\n    trace_send(transport.send(request))\n}\n"
+  },
+  {
+    "name": "swap",
+    "file": "config/limits.toml",
+    "input_text": "soft = 100\r\nhard = 80\r\n",
+    "output_text": "soft = 80\r\nhard = 100\r\n"
+  },
+  {
+    "name": "insert-line",
+    "file": "src/lib.rs",
+    "input_text": "use crate::config::Config;\r\nuse crate::io::Read;\r\n",
+    "output_text": "use crate::config::Config;\r\nuse crate::policy::Policy;\r\nuse crate::io::Read;\r\n"
+  },
+  {
+    "name": "delete-line",
+    "file": "src/main.rs",
+    "input_text": "fn main() {\n    // TODO: remove\n    run();\n}\n",
+    "output_text": "fn main() {\n    run();\n}\n"
+  },
+  {
+    "name": "span",
+    "file": "src/report.rs",
+    "input_text": "let body = format!(\n    \"{}\",\n    name,\n);\n",
+    "output_text": "let body = sanitize(format!(\n    \"{}\",\n    name,\n));\n"
+  },
+  {
+    "name": "window",
+    "file": "app.ini",
+    "input_text": "[server]\nport = 80\n[client]\nport = 80\n",
+    "output_text": "[server]\nport = 8080\n[client]\nport = 80\n"
+  },
+  {
+    "name": "ambiguous",
+    "file": "log.txt",
+    "input_text": "level = 1\nlevel = 2\n",
+    "refusal": "AmbiguousSelector"
+  }
+]

@@ -43,4 +43,6 @@ pub(crate) struct Parser<'a> {
 }
 
 #[cfg(test)]
+mod anchor_tests;
+#[cfg(test)]
 mod tests;

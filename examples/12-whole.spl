@@ -1,0 +1,6 @@
+edit "sdk/src/imports.rs" {
+  @config := one line "use crate::config::Config;"
+  @shim := one line "// legacy shim"
+  after whole @config insert lines like @config ["use crate::policy::Policy;"]
+  delete whole @shim
+}

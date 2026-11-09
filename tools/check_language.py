@@ -1,4 +1,4 @@
-"""Exercise every shipped /1 recipe and the live-to-frozen offline workflow."""
+"""Exercise every shipped /1 recipe, the quickstart card and the live-to-frozen offline workflow."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +12,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from evidence_identity import source_identity
+sys.path.insert(0, str(ROOT / "tools"))
+from language_cards import admitted_syntax, card_recipes, card_vectors
 TARGETS = {
     "01-await": "sdk/src/client.rs",
     "02-wrap": "sdk/src/driver.rs",
@@ -24,12 +26,15 @@ TARGETS = {
     "09-import": "sdk/src/lib.rs",
     "10-move": "cfg/service.conf",
     "11-absence": "data/table",
+    "12-whole": "sdk/src/imports.rs",
+    "13-from-to": "src/report.rs",
 }
 PATTERN = r"^route[ \t]+(?<verb>[A-Z]+)[ \t]+(?<path>/\S+)$"
 
 
-def run(binary: Path, work: Path, arguments: list[str]) -> dict:
-    result = subprocess.run([str(binary), *arguments], cwd=work, capture_output=True, check=False, timeout=120)
+def run(binary: Path, work: Path, arguments: list[str], stdin: bytes | None = None) -> dict:
+    result = subprocess.run([str(binary), *arguments], cwd=work, capture_output=True, check=False,
+                            timeout=120, input=stdin if stdin is not None else b"")
     return {"exit_status": result.returncode, "stdout_hex": result.stdout.hex(),
             "stderr": result.stderr.decode("utf-8", "replace")}
 
@@ -50,9 +55,11 @@ def main() -> int:
                "scope": "complete offline /1 language component",
                "status": "failed", "cases": []}
 
-    def case(name: str, arguments: list[str], status: int, expected: bytes | None) -> dict:
-        observed = run(binary, work, arguments)
-        receipt["cases"].append({"name": name, "arguments": arguments, **observed})
+    def case(name: str, arguments: list[str], status: int, expected: bytes | None,
+             stdin: bytes | None = None) -> dict:
+        observed = run(binary, work, arguments, stdin)
+        receipt["cases"].append({"name": name, "arguments": arguments, **observed,
+                                 **({"stdin_hex": stdin.hex()} if stdin is not None else {})})
         if observed["exit_status"] != status:
             raise ValueError(f"{name}: exit {observed['exit_status']} != {status}: {observed['stderr']}")
         if expected is not None and observed["stdout_hex"] != expected.hex():
@@ -76,6 +83,41 @@ def main() -> int:
             case(name, ["preview", "--root", str(work), str(recipe)], 0, expected)
             if target.read_bytes() != original:
                 raise ValueError(f"{name}: preview modified the target")
+
+        receipt["admitted_syntax"] = admitted_syntax()
+        cards = card_recipes()
+        for vector in card_vectors():
+            name, relative = vector["name"], vector["file"]
+            target = work / "cards" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            original = vector["input_text"].encode()
+            target.write_bytes(original)
+            recipe = cards[name].encode()
+            arguments = ["preview", "--root", str(work / "cards"), "--file", relative, "-"]
+            if "refusal" in vector:
+                refused = case(f"card_{name}", arguments, 2, b"", recipe)
+                if not refused["stderr"].startswith(f"refused: {vector['refusal']} at recipe ["):
+                    raise ValueError(f"card {name}: refusal is not {vector['refusal']}")
+            else:
+                case(f"card_{name}", arguments, 0, vector["output_text"].encode(), recipe)
+                diff = case(f"card_{name}_diff", arguments[:-1] + ["--diff", "-"], 0, None, recipe)
+                if not bytes.fromhex(diff["stdout_hex"]).startswith(f"--- a/{relative}\n".encode()):
+                    raise ValueError(f"card {name}: --diff did not print a unified diff")
+            if target.read_bytes() != original:
+                raise ValueError(f"card {name}: preview modified the target")
+        wrap = next(vector for vector in card_vectors() if vector["name"] == "wrap")
+        out_file = evidence / "card-wrap-candidate.rs"
+        out_arguments = ["preview", "--root", str(work / "cards"), "--file", wrap["file"],
+                         "--out", str(out_file), "-"]
+        case("card_wrap_out", out_arguments, 0, b"", cards["wrap"].encode())
+        if out_file.read_bytes() != wrap["output_text"].encode():
+            raise ValueError("--out wrote different bytes from the candidate")
+        case("card_wrap_out_exists", out_arguments, 2, b"", cards["wrap"].encode())
+        inside = out_arguments[:]
+        inside[inside.index(str(out_file))] = str(work / "cards" / "new-candidate.rs")
+        case("card_wrap_out_inside_root", inside, 2, b"", cards["wrap"].encode())
+        if (work / "cards" / "new-candidate.rs").exists():
+            raise ValueError("--out wrote inside the preview root")
 
         frozen_json = work / "routes-frozen.json"
         inspected = case("inspect_routes", [

@@ -53,5 +53,15 @@
     "name": "11-absence",
     "input_text": "y",
     "refusal": "AbsentGroup"
+  },
+  {
+    "name": "12-whole",
+    "input_text": "use crate::config::Config;\r\nuse crate::io::Read;\r\n// legacy shim\r\nfn main() {}",
+    "output_text": "use crate::config::Config;\r\nuse crate::policy::Policy;\r\nuse crate::io::Read;\r\nfn main() {}"
+  },
+  {
+    "name": "13-from-to",
+    "input_text": "let body = format!(\n        \"{}\",\n        name,\n    );\n    body\n",
+    "output_text": "let body = sanitize(format!(\n        \"{}\",\n        name,\n    ));\n    body\n"
   }
 ]

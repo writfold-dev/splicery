@@ -8,7 +8,9 @@
     "each @r in frozen @hits { replace @r.name with \"ok\" }",
     "replace @x with []",
     "edit \"r/x\" { # comment\n @window := range [0,2) }",
-    "after @a insert <<'X'\r\n# raw $x\r\nX"
+    "after @a insert <<'X'\r\n# raw $x\r\nX",
+    "@w := whole @a\ndelete from @a.left to @b",
+    "after whole @r.g insert \"x\""
   ],
   "reject": [
     "let @call = one text \"x\"",
@@ -23,6 +25,9 @@
     "delete @one",
     "edit \"a\" {",
     "edit \"r/f\" {} junk",
-    "replace @x with [\"a\",]"
+    "replace @x with [\"a\",]",
+    "delete whole one line \"x\"",
+    "delete from @a and @b",
+    "@from := one text \"x\""
   ]
 }

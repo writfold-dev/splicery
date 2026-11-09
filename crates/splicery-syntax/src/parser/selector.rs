@@ -18,6 +18,16 @@ impl Parser<'_> {
             let (second, end) = self.reference()?;
             return Ok((Selector::Between { first, second }, end));
         }
+        if self.eat_word("from")? {
+            let (first, _) = self.reference()?;
+            self.need_word("to")?;
+            let (second, end) = self.reference()?;
+            return Ok((Selector::FromTo { first, second }, end));
+        }
+        if self.eat_word("whole")? {
+            let (reference, end) = self.reference()?;
+            return Ok((Selector::Whole(reference), end));
+        }
         if self.eat_word("range")? {
             self.need_byte(b'[')?;
             let lo = self.nat()?;

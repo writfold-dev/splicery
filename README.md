@@ -23,7 +23,12 @@ SPLICERY=$PWD/target/release/splicery-cli
 cd examples/try
 "$SPLICERY" preview --root . --file client.rs add-retry.spl
 "$SPLICERY" preview --root . --file client.rs --report add-retry.spl
+"$SPLICERY" preview --root . --file client.rs --diff add-retry.spl
 ```
+
+Add `--diff` for a unified diff instead of the whole file, and pass `-` to read
+the recipe from stdin. A refusal names the match sites and a hint on stderr. The
+[agent quickstart](docs/agent-quickstart.md) fits the common idioms on one page.
 
 [`add-retry.spl`](examples/try/add-retry.spl) wraps the `open(url)` call inside
 `connect` with a retry and leaves the identical call in `probe` alone. A text

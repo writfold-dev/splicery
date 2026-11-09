@@ -39,6 +39,8 @@ KEYWORDS = frozenset(
         "line",
         "between",
         "and",
+        "from",
+        "whole",
         "range",
         "keep",
         "lines",

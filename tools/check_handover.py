@@ -67,7 +67,11 @@ def check_recipes():
         ('delete range [0,2) before range [2,2) insert "x"',b'ab','Overlap'),
         ('@a := one line "foo" @a := one line "foo"',b'foo','Duplicate'),
         ('replace @missing with "x"',b'foo','Unbound'),
-        ('each @r in line_matches rx"z" expect 1 { delete @r }',b'x','Cardinality')]
+        ('each @r in line_matches rx"z" expect 1 { delete @r }',b'x','Cardinality'),
+        ('@a := one text "a" delete whole @a',b'a\n','Whole'),
+        ('@a := range [2,3) @b := range [0,1) delete from @a to @b',b'abc','Markers'),
+        ('@a := range [0,2) @b := range [1,3) delete from @a to @b',b'abc','Markers'),
+        ('@a := range [1,1) @b := range [1,1) delete from @a to @b',b'abc','Markers')]
     for fragment, data, error in extras:
         try:
             run('edit "r/f" { '+fragment+' }',data)

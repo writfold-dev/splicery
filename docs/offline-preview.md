@@ -1,6 +1,6 @@
 # Offline preview client
 
-The `splicery` executable is a static Linux x86_64 musl client for the scoped offline component. It reads an existing regular file, resolves a recipe against that immutable image, and emits either the exact candidate bytes or a bounded exact splice report. It never writes the target and does not implement a Writfold transport, Worktrunk grant, `StaleTarget` apply refusal, effect receipt, or retry reconciliation.
+The `splicery` executable is a static Linux x86_64 musl client for the scoped offline component. It reads an existing regular file, resolves a recipe against that immutable image, and emits the exact candidate bytes, a bounded exact splice report or a unified diff. It never writes the target and does not implement a Writfold transport, Worktrunk grant, `StaleTarget` apply refusal, effect receipt, or retry reconciliation; applying an edit to a worktree belongs to Writfold.
 
 ## Crate boundaries
 
@@ -43,6 +43,17 @@ splicery preview --root /path/to/worktree --report wrap.spl
 
 Default preview writes only candidate bytes to stdout. `--report` instead writes one JSON object with `schema_version`, `scope`, `path`, `no_change`, `candidate_length`, and exact `edits`. Every edit includes the original `[lo,hi)` target, complete replacement hex and recipe byte span. A report over 16 KiB refuses rather than truncating identity information.
 
+`--diff` writes a unified diff (`--- a/PATH`, `+++ b/PATH`, three lines of context) derived from the same exact splices; no change prints nothing. It is a view for reading: the candidate remains the only thing a host applies. Lines without a final newline carry the usual `\ No newline at end of file` marker, and a diff over 16 KiB refuses rather than truncating. `--report` and `--diff` are exclusive; each invocation prints one view.
+
+A recipe argument of `-` reads the recipe from standard input (at most 256 KiB), so an agent can preview without writing a recipe file:
+
+```bash
+printf 'replace one text "80" with "100"' |
+  splicery preview --root /path/to/worktree --file config/limits.toml --diff -
+```
+
+`--out NEW_FILE` writes the selected view to a new file instead of stdout. The file must not exist and its directory must be outside `--root`; preview never replaces a file and never writes inside the worktree. Moving a candidate into place stays with the caller or, in the managed flow, with Writfold.
+
 For a fragment and an already captured span:
 
 ```splicery
@@ -58,7 +69,21 @@ Offsets are zero-based bytes into the original image, not UTF-16 or editor colum
 
 ## Line bindings
 
-A bare line target selects the line body without its terminator, and `after` inserts at the end of the selection ([language §3 and §7](../spec/language.md#binding-selection-and-execution)). So `after @line insert lines like @line [...]` places the new lines before `@line`'s terminator and joins the two lines, and `delete @line` leaves an empty line. To insert whole lines, insert `before` the following line (as [09-import](../examples/09-import.spl) does) or select the line together with its terminator using `one text`. The preview prints a `note:` on stderr, with the statement's recipe byte span, when a recipe contains either construct; stdout is unchanged and the meaning is not altered. Changing that meaning is a language-contract change covering the spec, the Lean surface calculus and the trusted rehearsal; it is not made by the preview.
+A bare line target selects the line body without its terminator, and `after` inserts at the end of the selection ([language §3 and §7](../spec/language.md#binding-selection-and-execution)). So `after @line insert lines like @line [...]` places the new lines before `@line`'s terminator and joins the two lines, and `delete @line` leaves an empty line. `whole @name` selects a line binding together with its terminator, `[start, fullEnd)`: `after whole @a insert lines like @a ["new"]` inserts a complete line after `@a`, and `delete whole @a` removes the line. On an unterminated final line `whole` selects the body through the end of the file. The preview prints a `note:` on stderr, with the statement's recipe byte span, when a recipe uses a bare line binding in either trap; stdout is unchanged and the meaning is not altered.
+
+## Refusals
+
+A refusal exits 2 with stdout empty and one fact per stderr line. The first line keeps the typed kind name and the recipe span, for example:
+
+```text
+refused: AmbiguousSelector at recipe [20,47) in src/log.rs
+  matched 2 sites: line 2 bytes [2,11); line 4 bytes [14,23)
+  line 2: level = 1
+  line 4: level = 1
+  hint: narrow it with `within` a window (`between` two unique lines, or `from @a to @b`), or add distinguishing context to the needle
+```
+
+Ambiguous selectors list the match count and at most four sites. A missing selector reports, when the work budget allows, lines that match after trimming spaces and tabs, matches with LF and CRLF exchanged, or matches outside its `within` window. Misordered `between` and `from … to` anchors name both anchors. Sites are line numbers and original byte ranges. File bytes (`line N: …`, at most 120 bytes per site) are shown only when the caller named the target file on the command line with `--file`; a recipe that names its own file gets positions and hints only. This is offline-preview policy; in the managed flow, diagnostics follow the host's grant rules (protocol rule 5) and this client adds nothing to them.
 
 ## Primitive differential interface
 
@@ -71,7 +96,7 @@ The command accepts `apply LO WIDTH INPUT_HEX REPLACEMENT_HEX`, with at most 409
 
 ## Admitted syntax and limits
 
-The preview accepts the /1 grammar: file-edit blocks and path-bound fragments, `@name :=` bindings, references and capture groups, `one text`, `one line`, `one hex`, `between`, `range`, `replace`, `delete`, `before`, `after`, `each ... in line_matches`/`frozen` iteration, STRING, HEX, HEREDOC, `keep`, `lines like` and `indent`. It enforces strict recipe UTF-8, original-coordinate reads, unique overlapping matches, source-order/no-shadow binding, UTF-8 boundaries, overlap refusal and input/candidate/payload/match limits. `create`, `rename` and `remove` print a typed file plan and are never executed. An offline preview is a scoped component, not a complete /1 profile claim.
+The preview accepts the /1 grammar: `edit` blocks (raw files `as bytes`) and path-bound fragments, `@name :=` bindings, references and capture groups, `one text`, `one line` and `one hex` selectors (optionally `within` a capture), `between @a and @b`, `from @a to @b`, `whole @a`, `range`, `replace … with`, `delete`, `before … insert`, `after … insert`, `each … in line_matches … expect N` and `frozen` iteration, STRING, HEX, HEREDOC, `keep`, `lines like` and `indent`. It enforces strict recipe UTF-8, original-coordinate reads, unique overlapping matches, source-order/no-shadow binding, UTF-8 boundaries, overlap refusal and input/candidate/payload/match limits. `create`, `rename … to` and `remove` print a typed file plan and are never executed. An offline preview is a scoped component, not a complete /1 profile claim. The language gate (tools/check_language.py) checks this paragraph against the grammar: every EBNF keyword must appear here, and every keyword must be exercised by a grammar accept case, an example or a quickstart recipe.
 
 ## Scratch runtime
 

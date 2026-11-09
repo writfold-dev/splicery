@@ -57,7 +57,8 @@ fn frozen_iteration_checks_identity_scope_members_and_binder_scope() -> Result<(
         missing.map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::UnknownBinding,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     let duplicate = lower(&frozen_iteration(), &image, &[], &[set.clone(), set]);
@@ -66,6 +67,7 @@ fn frozen_iteration_checks_identity_scope_members_and_binder_scope() -> Result<(
         Err(CompileDiagnostic {
             kind: CompileError::DuplicateBinding,
             origin: CAPTURE_ORIGIN,
+            detail: None
         })
     );
 
@@ -85,7 +87,8 @@ fn frozen_iteration_checks_identity_scope_members_and_binder_scope() -> Result<(
         lower(&leaked, &image, &[], &[empty_set]).map(|_| ()),
         Err(CompileDiagnostic {
             kind: CompileError::UnknownBinding,
-            origin: ORIGIN
+            origin: ORIGIN,
+            detail: None
         })
     );
     Ok(())

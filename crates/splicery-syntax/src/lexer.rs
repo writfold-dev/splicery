@@ -241,6 +241,8 @@ fn reserved_bytes(name: &[u8]) -> bool {
         "line",
         "between",
         "and",
+        "from",
+        "whole",
         "range",
         "keep",
         "lines",

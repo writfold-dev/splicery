@@ -1,6 +1,6 @@
 # Agent recipe cards
 
-All .spl files in this directory are exercised from original recipe text. Exact inputs, expected bytes or refusals are in [the vectors](../qualification/recipe-vectors.json). Run python3 -B tools/check_handover.py from the archive root. The rehearsal is an independent bounded implementation for the trusted examples.
+All .spl files in this directory are exercised from original recipe text. For a one-page agent summary see the [quickstart card](../docs/agent-quickstart.md). Exact inputs, expected bytes or refusals are in [the vectors](../qualification/recipe-vectors.json). Run python3 -B tools/check_handover.py from the archive root. The rehearsal is an independent bounded implementation for the trusted examples.
 
 | Card | What to look for |
 |---|---|
@@ -15,6 +15,8 @@ All .spl files in this directory are exercised from original recipe text. Exact 
 | 09-import | Disambiguate duplicate text inside an explicitly selected window |
 | 10-move | Move a comment and its line as a single captured unit |
 | 11-absence | Reject use of an absent optional group |
+| 12-whole | `whole` line selection: insert a complete line after another, delete a line with its terminator |
+| 13-from-to | `from … to`: a long span from two short anchors, without byte offsets |
 
 Interactive fragment: **after @call insert ".await"**. The bound client supplies the file, capture epoch and authorized target. In a recipe, **@call := one text "transport.send(request)"** creates a local name. Use inspect/peek to avoid spelling a long original passage; pass a durable exact binding when crossing a session boundary. On Ambiguous inspect the bounded candidates and narrow with within. On StaleTarget reread the bounded current target and prepare a new edit with a new request key. On Unknown look up/reconcile the original effect. Do not retry a write merely because its acknowledgement was lost.
 

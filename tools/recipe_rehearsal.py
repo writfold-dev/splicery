@@ -47,6 +47,16 @@ def run(source, base):
             if not a.eol or b.eol is None or a.pos.hi+len(a.eol) > b.pos.lo:
                 raise Refusal('Markers')
             return Capture(Span(a.pos.hi+len(a.eol), b.pos.lo))
+        if t[0].kind == 'from':
+            a, b = reference(t[1]), reference(t[3])
+            if a.pos == b.pos or a.pos.hi > b.pos.lo:
+                raise Refusal('Markers')
+            return Capture(Span(a.pos.lo, b.pos.hi))
+        if t[0].kind == 'whole':
+            line = reference(t[1])
+            if line.eol is None:
+                raise Refusal('Whole')
+            return Capture(Span(line.pos.lo, line.pos.hi+len(line.eol)))
         window = reference(t[-1]).pos if t[-1].kind == 'reference' else Span(0, len(base))
         kind = t[1].kind
         if raw and kind != 'HEX':

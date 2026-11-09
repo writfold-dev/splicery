@@ -1,0 +1,7 @@
+edit "src/report.rs" {
+  @open := one text "format!(\n"
+  @tail := one text "    );\n    body"
+  @close := one text ")" within @tail
+  @expr := from @open to @close
+  replace @expr with ["sanitize(", keep(@expr), ")"]
+}

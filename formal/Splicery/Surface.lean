@@ -56,6 +56,9 @@ def LineInfo.bytes : LineInfo → Option Bytes
   | .lf => some [10]
   | .crlf => some [13, 10]
 
+/-- Terminator width of a line binding; an unterminated final line has none. -/
+def eolLength (info : LineInfo) : Nat := (info.bytes.map List.length).getD 0
+
 structure Region where
   image : Nat
   lo : Nat
@@ -406,6 +409,8 @@ inductive Selector where
   | oneLine (quotedBody : Bytes) (within : Option Ref)
   | oneHex (hexNeedle : Bytes) (within : Option Ref)
   | between (first second : Ref)
+  | fromTo (first second : Ref)
+  | whole (line : Ref)
   deriving Repr
 
 private def rootCapture (image : Image) : Capture :=
@@ -491,6 +496,27 @@ def select (image : Image) (profile : Profile) (oracle : TextOracle)
           let _ ← checkCapture image profile oracle c
           pure c
         else none
+  | .fromTo firstRef secondRef => do
+      let first ← resolveRef env firstRef
+      let _ ← checkCapture image profile oracle first
+      let second ← resolveRef env secondRef
+      let _ ← checkCapture image profile oracle second
+      if first.region ≠ second.region ∧ first.region.hi ≤ second.region.lo then do
+        let c : Capture :=
+          { region := ⟨image.id, first.region.lo, second.region.hi,
+            image.readable, image.writable⟩ }
+        let _ ← checkCapture image profile oracle c
+        pure c
+      else none
+  | .whole lineRef => do
+      let line ← resolveRef env lineRef
+      let _ ← checkCapture image profile oracle line
+      let info ← line.line
+      let c : Capture :=
+        { region := ⟨image.id, line.region.lo, line.region.hi + eolLength info,
+          line.region.readable, line.region.writable⟩ }
+      let _ ← checkCapture image profile oracle c
+      pure c
 
 theorem oneHex_empty_needle_refuses (image : Image) (profile : Profile) (oracle : TextOracle)
     (env : Env) (within : Option Ref) :
@@ -890,6 +916,37 @@ theorem selectedCut_sound {image : Image} {profile : Profile} {oracle : TextOrac
         subst c
         exact (surfaceCut_sound hc).1
 
+/-- A checked capture is a region of this image with `lo ≤ hi ≤ |image|`. -/
+theorem checkCapture_bounds {image : Image} {profile : Profile} {oracle : TextOracle}
+    {c : Capture} {u : Unit} (h : checkCapture image profile oracle c = some u) :
+    c.region.image = image.id ∧ c.region.lo ≤ c.region.hi ∧
+      c.region.hi ≤ image.bytes.length := by
+  unfold checkCapture at h
+  split at h
+  · rename_i ho
+    simp only [originOK, Bool.and_eq_true, decide_eq_true_eq] at ho
+    exact ho.1.1.1.1
+  · simp at h
+
+/-- Every selector, including `whole` and `from … to`, lowers to one plain checked
+`[lo,hi)` cut of the original: the prefix has length `lo` and the selection `hi - lo`. -/
+theorem selectedCut_plain {image : Image} {profile : Profile} {oracle : TextOracle}
+    {env : Env} {target : Selector} {cut : SurfaceCut}
+    (h : selectedCut image profile oracle env target = some cut) :
+    ∃ c, select image profile oracle env target = some c ∧
+      surfaceCut image.bytes c.region.lo c.region.hi = some cut ∧
+      cut.pre.length = c.region.lo ∧ cut.selected.length = c.region.hi - c.region.lo := by
+  cases hs : select image profile oracle env target with
+  | none => simp [selectedCut, hs] at h
+  | some cap =>
+    cases ht : checkTarget image profile oracle cap with
+    | none => simp [selectedCut, hs, ht] at h
+    | some _ =>
+      have hc : surfaceCut image.bytes cap.region.lo cap.region.hi = some cut := by
+        simpa [selectedCut, hs, ht] using h
+      have hsound := surfaceCut_sound hc
+      exact ⟨cap, rfl, hc, hsound.2.1, hsound.2.2⟩
+
 /-- Surface-to-IR refinement for every command and every payload production. -/
 theorem lowerChange_refines {image : Image} {profile : Profile} {oracle : TextOracle}
     {env : Env} {change : Change} {compiled : Cut × Command}
@@ -1092,6 +1149,116 @@ example : select testImage .text testOracle [([97], lineA), ([98], secondByte)]
     (.between { name := [97] } { name := [98] }) = none := by decide
 example : select testImage .text testOracle [([97], lineB), ([98], lineA)]
     (.between { name := [97] } { name := [98] }) = none := by decide
+
+/-! `whole @line` is `[start, fullEnd)` and `from @a to @b` is `[start(a), end(b))`; both are
+plain checked regions, so `lowerChange_executes` covers them without kernel or IR changes. -/
+
+theorem select_whole_sound {image : Image} {profile : Profile} {oracle : TextOracle}
+    {env : Env} {r : Ref} {c : Capture}
+    (h : select image profile oracle env (.whole r) = some c) :
+    ∃ line info, resolveRef env r = some line ∧ line.line = some info ∧
+      c = { region := ⟨image.id, line.region.lo, line.region.hi + eolLength info,
+        line.region.readable, line.region.writable⟩ } ∧
+      line.region.lo ≤ line.region.hi + eolLength info ∧
+      line.region.hi + eolLength info ≤ image.bytes.length := by
+  cases hr : resolveRef env r with
+  | none => simp [select, hr] at h
+  | some line =>
+    cases hc : checkCapture image profile oracle line with
+    | none => simp [select, hr, hc] at h
+    | some _ =>
+      cases hi : line.line with
+      | none => simp [select, hr, hc, hi] at h
+      | some info =>
+        cases hw : checkCapture image profile oracle
+            { region := ⟨image.id, line.region.lo, line.region.hi + eolLength info,
+              line.region.readable, line.region.writable⟩ } with
+        | none => simp [select, hr, hc, hi, hw] at h
+        | some u =>
+          simp [select, hr, hc, hi, hw] at h
+          subst h
+          have hb := checkCapture_bounds hw
+          exact ⟨line, info, rfl, hi, rfl, hb.2.1, hb.2.2⟩
+
+theorem whole_requires_line {image : Image} {profile : Profile} {oracle : TextOracle}
+    {env : Env} {r : Ref} {line : Capture}
+    (hl : resolveRef env r = some line) (hn : line.line = none) :
+    select image profile oracle env (.whole r) = none := by
+  cases hc : checkCapture image profile oracle line <;> simp [select, hl, hc, hn]
+
+-- CRLF, LF and an unterminated final line (to EOF); a plain capture refuses.
+example : select testImage .text testOracle [([108], lineA)] (.whole { name := [108] }) =
+    some { region := ⟨7, 0, 4, true, true⟩ } := by decide
+example : select testImage .text testOracle [([108], lineB)] (.whole { name := [108] }) =
+    some { region := ⟨7, 4, 6, true, true⟩ } := by decide
+example : select testImage .text testOracle [([108], lineLast)] (.whole { name := [108] }) =
+    some { region := ⟨7, 6, 7, true, true⟩ } := by decide
+example : select testImage .text testOracle [([108], firstByte)]
+    (.whole { name := [108] }) = none := by decide
+example : denoteChange testImage .text testOracle [([108], lineB)]
+    (.delete (.whole { name := [108] })) = some [97, 97, 13, 10, 98] := by decide
+example : denoteChange testImage .text testOracle [([108], lineA)]
+    (.after (.whole { name := [108] }) [.linesLike { name := [108] } [[120]]]) =
+      some [97, 97, 13, 10, 120, 13, 10, 32, 10, 98] := by decide
+
+theorem select_fromTo_sound {image : Image} {profile : Profile} {oracle : TextOracle}
+    {env : Env} {a b : Ref} {c : Capture}
+    (h : select image profile oracle env (.fromTo a b) = some c) :
+    ∃ first second, resolveRef env a = some first ∧ resolveRef env b = some second ∧
+      first.region ≠ second.region ∧ first.region.hi ≤ second.region.lo ∧
+      c = { region := ⟨image.id, first.region.lo, second.region.hi,
+        image.readable, image.writable⟩ } ∧
+      first.region.lo ≤ second.region.hi ∧ second.region.hi ≤ image.bytes.length := by
+  cases ha : resolveRef env a with
+  | none => simp [select, ha] at h
+  | some first =>
+    cases hc1 : checkCapture image profile oracle first with
+    | none => simp [select, ha, hc1] at h
+    | some _ =>
+      cases hb : resolveRef env b with
+      | none => simp [select, ha, hc1, hb] at h
+      | some second =>
+        cases hc2 : checkCapture image profile oracle second with
+        | none => simp [select, ha, hc1, hb, hc2] at h
+        | some _ =>
+          by_cases hok : first.region ≠ second.region ∧ first.region.hi ≤ second.region.lo
+          · cases hw : checkCapture image profile oracle
+                { region := ⟨image.id, first.region.lo, second.region.hi,
+                  image.readable, image.writable⟩ } with
+            | none => simp [select, ha, hc1, hb, hc2, hok, hw] at h
+            | some u =>
+              simp [select, ha, hc1, hb, hc2, hok, hw] at h
+              subst h
+              have hbounds := checkCapture_bounds hw
+              exact ⟨first, second, rfl, rfl, hok.1, hok.2, rfl, hbounds.2.1, hbounds.2.2⟩
+          · simp [select, ha, hc1, hb, hc2, hok] at h
+-- Both anchors and the bytes between them; reversed, coincident and overlapping refuse.
+example : select testImage .text testOracle [([97], firstByte), ([98], secondByte)]
+    (.fromTo { name := [97] } { name := [98] }) =
+      some { region := ⟨7, 0, 2, true, true⟩ } := by decide
+example : select testImage .text testOracle [([97], lineA), ([98], lineLast)]
+    (.fromTo { name := [97] } { name := [98] }) =
+      some { region := ⟨7, 0, 7, true, true⟩ } := by decide
+example : select testImage .text testOracle [([97], secondByte), ([98], firstByte)]
+    (.fromTo { name := [97] } { name := [98] }) = none := by decide
+example : select testImage .text testOracle [([97], firstByte), ([98], firstByte)]
+    (.fromTo { name := [97] } { name := [98] }) = none := by decide
+example : select testImage .text testOracle [([97], lineA), ([98], secondByte)]
+    (.fromTo { name := [97] } { name := [98] }) = none := by decide
+
+theorem fromTo_refuses_misordered {image : Image} {profile : Profile} {oracle : TextOracle}
+    {env : Env} {a b : Ref} {first second : Capture}
+    (ha : resolveRef env a = some first) (hb : resolveRef env b = some second)
+    (hbad : first.region = second.region ∨ second.region.lo < first.region.hi) :
+    select image profile oracle env (.fromTo a b) = none := by
+  have hn : ¬(first.region ≠ second.region ∧ first.region.hi ≤ second.region.lo) := by
+    rintro ⟨hne, hle⟩
+    rcases hbad with heq | hlt
+    · exact hne heq
+    · omega
+  cases hc1 : checkCapture image profile oracle first <;>
+    cases hc2 : checkCapture image profile oracle second <;>
+    simp [select, ha, hb, hc1, hc2, hn]
 
 -- L07: escapes, exact Unicode bytes, heredoc EOLs, raw hex and malformed inputs.
 example : decodeQuoted [65, 92, 110, 66] = some [65, 10, 66] := by decide

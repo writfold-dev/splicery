@@ -31,6 +31,7 @@ REQUIRED_CONTROLS = {
     "mutant-omit-prepared-input-field": "Splicery.stamp_binds_input",
     "mutant-accept-stale-unsupported-profile": "Splicery.stale_or_unsupported_profile_cannot_prepare",
     "mutant-ignore-write-grant": "Splicery.read_only_grant_cannot_authorize",
+    "mutant-accept-overlapping-from-to": "Splicery.Surface.select_fromTo_sound",
 }
 
 
@@ -205,6 +206,15 @@ def copy_project(source: Path, destination: Path) -> None:
 def theorem_line(source: Path, name: str) -> int:
     text = source.read_text()
     return text[:text.index(f"theorem {name}")].count("\n") + 1
+
+
+def theorem_lines(source: Path, name: str) -> tuple[int, ...]:
+    """Every line from `theorem name` up to (excluding) the next theorem."""
+    text = source.read_text()
+    first = theorem_line(source, name)
+    later = [text[:match.start()].count("\n") + 1 for match in THEOREM.finditer(text)]
+    end = min((line for line in later if line > first), default=len(text.splitlines()) + 1)
+    return tuple(range(first, end))
 
 
 def source_line(text: str, marker: str) -> int:
@@ -545,6 +555,14 @@ end Splicery.Mutants
             "grant.write && grant.scope = input.ir.image.scope &&",
             "true && grant.scope = input.ir.image.scope &&", "mutant-ignore-write-grant",
             allowed_late=(232,),
+        )
+        # Dropping the anchor-order check must break the from/to soundness theorem and
+        # its reversed/overlapping examples; the general refusal theorem fails with it.
+        require_intended_failure(
+            record, destination, control, mutant, "Splicery/Surface.lean", "select_fromTo_sound",
+            "if first.region ≠ second.region ∧ first.region.hi ≤ second.region.lo then do",
+            "if first.region ≠ second.region then do", "mutant-accept-overlapping-from-to",
+            allowed_late=theorem_lines(control / "Splicery/Surface.lean", "fromTo_refuses_misordered"),
         )
         observed_controls = {entry["name"]: entry["target"] for entry in record["mutants"]}
         if observed_controls != control_targets:
