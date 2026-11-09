@@ -69,6 +69,10 @@ def main() -> int:
                 "-v", f"{ROOT}:/work/splicery:ro", "-v", f"{output}:/evidence",
                 "-v", f"{registry}:/opt/cargo/registry",
                 "-e", f"CARGO_TARGET_DIR=/evidence/target-{name}",
+                # run_build.py binds the source identity with git; the read-only
+                # checkout is owned by another uid, as in the compose service.
+                "-e", "GIT_CONFIG_COUNT=1", "-e", "GIT_CONFIG_KEY_0=safe.directory",
+                "-e", "GIT_CONFIG_VALUE_0=/work/splicery",
                 "splicery-tools:qualification", "python3", "-B", "scripts/run_build.py",
                 "--evidence", f"/evidence/out-{name}", "--rust-version", "1.98.0",
             ]
