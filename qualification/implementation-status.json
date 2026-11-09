@@ -13,7 +13,7 @@
       "status": "source_bound_final_run_registered",
       "evidence": "qualification/gate-status.json and qualification/scenario-status.json",
       "gates": "SG00-SG07",
-      "note": "Final receipts are generated only after the clean source commit; no prior receipt is reused as release evidence."
+      "note": "Final receipts are generated only after the clean source commit; no prior receipt is reused as release evidence. Current closure: *-ergo-002 at accebc2 (see agent_edit_ergonomics.final_run); the earlier *-final-001 closure at c696b6e is history."
     },
     "sg07_operational_model": {
       "status": "passed_bounded_model_component",
@@ -69,12 +69,38 @@
       }
     },
     "agent_edit_ergonomics": {
-      "status": "implemented_final_receipts_registered",
+      "status": "offline_gates_passed_at_accebc2",
       "decision": "docs/proposals/2026-11-agent-edit-ergonomics-decision.md (owner decision 2026-11-09 on PR #1)",
       "accepted": ["P1 refusal diagnostics", "P2 --diff", "P3 agent quickstart card", "P4 stdin recipe", "P5 whole @line", "P6a from @a to @b", "admitted-syntax gate check"],
       "deferred": ["P6b balanced heuristic", "P7 standalone apply (preview --out offered instead)", "P8 multi-block documents"],
       "surface_change": "spec/language.md §3-§4, spec/splicery.ebnf, formal/Splicery/Surface.lean, crates/splicery-compile/src/anchors.rs, tools/recipe_rehearsal.py, grammar cases, examples 12-13 and recipe/differential vectors; kernel, resolved IR and Core/Batch/Lowering.lean unchanged",
-      "evidence": "receipts named in qualification/gate-status.json and scenario-status.json (*-ergo-001)",
+      "evidence": "receipts named in qualification/gate-status.json and scenario-status.json (*-ergo-002), all bound to source commit accebc2",
+      "final_run": {
+        "source_commit": "accebc2bd66ad8869a1bd40b5049c22612670edf",
+        "date": "2026-11-09",
+        "aggregate": {"path": "aggregate-ergo-002/receipt.json", "sha256": "f9fa283ecbb2609e6eb2593b3637d4446bacb305f3e13c6c58959bdf7c71c3f3", "status": "blocked_external_dependencies", "offline_complete": true},
+        "index": {"path": "index-ergo-002.json", "sha256": "3fea3f64ab2c992ca3cc9bd9a30da7b0c4d1972e87c04e4775e2d4c7cfaf2528"},
+        "receipts": {
+          "SG00": {"sg00-ergo-002/receipt.json": "454a291a42d0e604429c93e8bd5df76768d7db0dcd70e196b1b54cdc94c5483e", "preflight-ergo-002/preflight-receipt.json": "a9b02e8b8095c30ca5ca7b4f48d1cabeb2496743589b5e0533e1e6ff83c2468a", "reproduction-ergo-002/reproduction-receipt.json": "cfe88edf20e187d1f93e788775394d7e0960e377b5884ede3ba9cd51064c36cd"},
+          "SG01": {"sg01-ergo-002/receipt.json": "9b862c0ae9cb56dfbbe942742b7e8350acbd23b6dc0a29d5f5967b75f6a0f04d"},
+          "SG02": {"lean-ergo-002/receipt.json": "443b149fd0ad39f0d74a7ee68a9caf56173c339d63dab44c7cf17f9600b84d67"},
+          "SG03": {"authority-ergo-002/receipt.json": "8ff23cd362bd2b0d9fe31dd6355f06065684d9c63f889a2af199f156fec3c97e"},
+          "SG04": {"language-ergo-002/language-receipt.json": "b847c96eff9684121495a5557238313e8261fc26525881b58ad7c8589f2e31d3", "nominal-ergo-002/nominal-receipt.json": "0bb2a81a9f1d6524b103d22465da4933f33ff00cf7fc5b55699c8084956f0291"},
+          "SG05": {"sg05-ergo-002/sg05-receipt.json": "160b945becf52120e150df324480793c7b2ad98a89f6a6724f68fd56bcc9dd19", "differential-ergo-002/differential-receipt.json": "41b555ea9924e0cdac0ef21687f9015377a5fd88771249112b173a9fa5438d2f", "surface-differential-ergo-002/surface-differential-receipt.json": "fa8867448a586ac3080a2cdce1bbee362f15114e1f519fa46a5b58446538fb45"},
+          "SG06": {"fuzz-ergo-002/fuzz-receipt.json": "8f6a72078d4951db585cde6bc34d9d71117f54bded256fcf3f83740c2ac93962"},
+          "SG07": {"sg07-ergo-002/model-receipt.json": "ca17077ed092b210b42cd5dadf79af2792af0d732005576c9a1736e99c5ec6a1"}
+        },
+        "observed": {"lean_public_theorems": 109, "lean_mutant_controls": 12, "sg01_cases": 114, "language_cases": 37, "surface_vectors": 13, "normalized_primitive_executions": 17, "aeneas_audited_theorems": 105, "aeneas_required_claims": 25, "aeneas_calibrated_mutants": 23, "proofs_gate_seconds": 567.9, "fuzz_cases": 2267, "fuzz_failed": 0, "static_client_sha256": "e632dee8bff3f295490e50f7d4ae2043792bc6309a2704364cc7b47c2b02493c"},
+        "retained_failed_attempts": [
+          {"path": "reproduction-ergo-001-failed-enomem", "commit": "0c7f45d", "cause": "registry seed copy hit ENOMEM writing to the evidence drive while another proofs run was active"},
+          {"path": "reproduction-ergo-001", "commit": "0c7f45d", "cause": "check_reproduction.py docker run lacked the safe.directory git config run_build.py needs; fixed in accebc2 and receipts re-registered as -ergo-002"},
+          {"path": "sg00-ergo-001, preflight-ergo-001", "commit": "0c7f45d", "cause": "passed, superseded by the -ergo-002 run at accebc2"},
+          {"path": "reproduction-ergo-002-failed-enomem", "commit": "accebc2", "cause": "second cold build: rustc ENOMEM writing to the evidence drive on a loaded shared host"},
+          {"path": "reproduction-ergo-002-failed-seed-timeout", "commit": "accebc2", "cause": "registry seed copy exceeded the 1800 s timeout on the loaded host"},
+          {"path": "differential-ergo-002-failed-readonly-lake", "commit": "accebc2", "cause": "invoked with --lean-project formal on the read-only mount; rerun against the lean gate's built control project"},
+          {"path": "sg07-ergo-002-failed-tlaps-backend", "commit": "accebc2", "cause": "1/894 TLAPS obligations hit a backend error under host load; model unchanged since it last proved 894/894; retry proved all"}
+        ]
+      },
       "not_claimed": ["benchmark improvement (no campaign was run)", "managed-flow diagnostics policy (protocol rule 5 unchanged)", "production write capability"]
     },
     "runtime_notice_packaging": {
