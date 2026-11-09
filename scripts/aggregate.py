@@ -70,7 +70,9 @@ def validate_receipt(root: Path, entry: dict, gate_id: str, source_identity: dic
     if receipt.get("gate") != gate_id:
         fail(f"receipt gate mismatch for {gate_id}: {path}")
     status = receipt.get("status")
-    if status != "pass" and not (isinstance(status, str) and status.startswith("passed_")):
+    # "passed" is the SG01 producer's spelling; earlier runs copied that receipt
+    # and rewrote the copy to "pass". Accept it as written instead.
+    if status not in ("pass", "passed") and not (isinstance(status, str) and status.startswith("passed_")):
         fail(f"receipt is not passing for {gate_id}: {path}: {status}")
     if receipt.get("error") is not None or receipt.get("errors") not in (None, []):
         fail(f"receipt contains failures for {gate_id}: {path}")

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "scope": "Owner amendments to release-gate criteria. qualification/gates.json and qualification/gates.md are the immutable handover registry and stay unchanged; an amendment here states the replaced wording verbatim and what evidence now satisfies it. A producer that relies on an amendment names its id and the digest of this file.",
+  "amendments": [
+    {
+      "id": "SG05-A1",
+      "gate": "SG05",
+      "status": "accepted",
+      "date": "2026-11-09",
+      "decided_by": "Splicery owner (Tarek)",
+      "record": "docs/proposals/2026-11-agent-edit-ergonomics-decision.md#sg05-amendment",
+      "amends": "pass_criteria (first sentence) and receipt_material (Verus logs)",
+      "original_pass_criteria": "Verus verifies actual selected production bodies and checked conversions/unaltered outside bytes for normalized batch. Audit bridges from proof definitions to exact shipping configuration. Differential compare Lean and Rust on success/refusal including input bytes, normalized IR, complete after-image and origins.",
+      "original_receipt_material": "Verus logs and selected function mapping, trusted-base inventory, independent Lean↔Rust vectors, mutation results.",
+      "amended_pass_criteria": "The Aeneas proofs gate (docker compose run --build --rm proofs) passes over the shipped crates/splicery-splice: a fresh Charon/Aeneas translation equals the committed proofs/Extracted byte for byte (drift check), lake build proves the theorems over that translation, the axiom audit admits only propext, Classical.choice and Quot.sound and finds every required claim, and every semantic mutant of crates/splicery-splice is rejected by exactly its named theorems (mutant calibration). The remaining SG05 criteria are unchanged: Lean and Rust are differentially compared on success and refusal, including input bytes, normalized IR, the complete after-image and origins.",
+      "amended_receipt_material": "Proofs-gate log and image identity, proved-function mapping (proofs/README.md), trusted-base inventory, axiom audit counts, mutant calibration count, and fresh primitive and surface Lean↔Rust differential receipts bound to the same source identity.",
+      "not_covered": [
+        "The splicery-kernel facade (domain-to-kernel mapping, applying the proved order, and the core::str::from_utf8 check of text candidates) is tested, not proved; 'checked conversions' at that boundary rest on tests and the differential suites.",
+        "Text-profile boundary agreement with str::is_char_boundary relies on the domain invariant that a text OriginalImage is well-formed UTF-8.",
+        "The Charon/Aeneas translation, its standard-library models and rustc compiling the translated source are trusted.",
+        "Different proof systems and differential agreement are not a refinement theorem between the Lean calculus in formal/ and the translation in proofs/."
+      ],
+      "negative_control_mapping": {
+        "wrong coordinate order": [
+          "sort-descending",
+          "reversed-cut-accepted"
+        ],
+        "unchecked length add": [
+          "apply-at-unchecked-width",
+          "payload-cap-off-by-one",
+          "render-cap-ignores-emitted"
+        ],
+        "accidental Unicode normalization": [
+          "text-end-unchecked",
+          "continuation-range",
+          "surface differential crlf-normalization"
+        ],
+        "sequential swap": [
+          "render-copies-candidate",
+          "surface differential sequential-capture"
+        ],
+        "deletion of one source linkage": [
+          "copy-wrong-range",
+          "render-drops-gap",
+          "render-drops-tail"
+        ],
+        "zero-length boundary bug": [
+          "touching-insertion-compatible",
+          "overlap-compatible"
+        ]
+      },
+      "supersedes_evidence": [
+        "verus-final-001/verus-receipt.json"
+      ],
+      "producer": "tools/check_sg05.py"
+    }
+  ]
+}

@@ -38,6 +38,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--scenario-dir", default="scenario-receipts",
+                        help="fresh directory under the evidence root for scenario receipts")
     args = parser.parse_args()
     evidence_root = args.evidence_root.resolve()
     identity = source_identity(ROOT)
@@ -62,7 +64,7 @@ def main() -> int:
         if entry["status"] == "blocked":
             scenarios[scenario_id] = {"status": "blocked", "blockers": entry["blockers"]}
             continue
-        receipt_path = Path("scenario-receipts") / f"{scenario_id}.json"
+        receipt_path = Path(args.scenario_dir) / f"{scenario_id}.json"
         write_new(evidence_root / receipt_path, {
             "schema_version": 1,
             "gate": scenario_id,

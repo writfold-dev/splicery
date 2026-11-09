@@ -62,11 +62,20 @@
         "text-profile boundary agreement with str::is_char_boundary beyond the domain's well-formed UTF-8 invariant",
         "capture digest computation (splicery-domain, SHA-256)",
         "syntax, lowering, frozen iteration and wire codecs (formal/, model/, differential and fuzz suites)",
-        "an SG05 receipt: SG05's Verus criterion needs an owner amendment (qualification/gate-status.json)"
+        "an SG05 pass by itself: SG05 is evaluated under owner amendment SG05-A1 (qualification/gate-amendments.json) by tools/check_sg05.py, which also requires fresh Lean/Rust differential receipts"
       ],
       "retired": {
         "verus_kernel_family": "Verus pre/postconditions for apply_at, replacement_len, candidate_len, materialize and emit_gaps (crates/splicery-kernel/src/spec.rs), scripts/run_verus.py with its four mutants and qualification/verus-trusted-base.json. The bodies moved to crates/splicery-splice and are proved there; the vstd dependency is gone. The Verus binary stays in the admitted tool image (toolchains.lock.json) and is no longer used by any Splicery body."
       }
+    },
+    "agent_edit_ergonomics": {
+      "status": "implemented_final_receipts_registered",
+      "decision": "docs/proposals/2026-11-agent-edit-ergonomics-decision.md (owner decision 2026-11-09 on PR #1)",
+      "accepted": ["P1 refusal diagnostics", "P2 --diff", "P3 agent quickstart card", "P4 stdin recipe", "P5 whole @line", "P6a from @a to @b", "admitted-syntax gate check"],
+      "deferred": ["P6b balanced heuristic", "P7 standalone apply (preview --out offered instead)", "P8 multi-block documents"],
+      "surface_change": "spec/language.md §3-§4, spec/splicery.ebnf, formal/Splicery/Surface.lean, crates/splicery-compile/src/anchors.rs, tools/recipe_rehearsal.py, grammar cases, examples 12-13 and recipe/differential vectors; kernel, resolved IR and Core/Batch/Lowering.lean unchanged",
+      "evidence": "receipts named in qualification/gate-status.json and scenario-status.json (*-ergo-001)",
+      "not_claimed": ["benchmark improvement (no campaign was run)", "managed-flow diagnostics policy (protocol rule 5 unchanged)", "production write capability"]
     },
     "runtime_notice_packaging": {
       "status": "passed_scoped_observed_binary_component",
