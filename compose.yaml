@@ -2,7 +2,11 @@ name: splicery
 
 services:
   qualify:
-    image: ${SPLICERY_TOOL_IMAGE:?Run scripts/gate bootstrap first}
+    # scripts/gate always sets both variables. Unset, they name an image that
+    # does not exist (never pulled) and a bind source that does not exist, so
+    # `qualify` still refuses to run, while the self-contained `proofs`
+    # service below stays usable without them.
+    image: ${SPLICERY_TOOL_IMAGE:-splicery-unadmitted-tool-image}
     pull_policy: never
     platform: linux/amd64
     working_dir: /work/splicery
@@ -26,12 +30,26 @@ services:
         target: /work/splicery
         read_only: true
       - type: bind
-        source: ${SPLICERY_ATTEMPT:?Select a fresh out-of-tree evidence directory}
+        source: ${SPLICERY_ATTEMPT:-/nonexistent/splicery-attempt-unset}
         target: /evidence
       - target:/cache/target
       - registry:/opt/cargo/registry
       - git:/opt/cargo/git
     command: [python3, -B, tools/check_proofs.py, --evidence, /evidence/lean-proofs]
+
+  # The Lean proof gate over the Charon/Aeneas translation of
+  # crates/splicery-splice: regenerate, refuse drift against the committed
+  # proofs/Extracted/, lake build, axiom audit, mutant calibration. It needs
+  # no admitted tool image or evidence directory and runs on its own:
+  #   docker compose run --build --rm proofs
+  #   sh proofs/refresh.sh      # regenerate and copy out proofs/Extracted/
+  proofs:
+    profiles: [proofs]
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: proofs/Dockerfile
+      target: gate
 
 volumes:
   target:
